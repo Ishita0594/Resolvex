@@ -1,0 +1,35 @@
+# Status Machine
+
+## Case Statuses
+- `DRAFT`
+- `SUBMITTED`
+- `AWAITING_MERCHANT`
+- `EVIDENCE_PROCESSING`
+- `UNDER_EVALUATION`
+- `HUMAN_REVIEW`
+- `RESOLVED`
+- `APPEALED`
+- `CLOSED`
+
+## Transition Rules
+| From | To | Trigger Role | Reason |
+| --- | --- | --- | --- |
+| `DRAFT` | `SUBMITTED` | `CARD_MEMBER` | Card member submits a disputed transaction case. |
+| `SUBMITTED` | `AWAITING_MERCHANT` | `ANALYST` | Analyst or system requests merchant evidence. |
+| `AWAITING_MERCHANT` | `EVIDENCE_PROCESSING` | `MERCHANT` | Merchant uploads required evidence. |
+| `SUBMITTED` | `EVIDENCE_PROCESSING` | `ANALYST` | Analyst confirms enough evidence exists without merchant follow-up. |
+| `EVIDENCE_PROCESSING` | `UNDER_EVALUATION` | `ANALYST` | Structured evidence extraction is complete and ready for policy evaluation. |
+| `UNDER_EVALUATION` | `RESOLVED` | `ANALYST` | Deterministic policy engine reaches a supported outcome with sufficient confidence. |
+| `UNDER_EVALUATION` | `HUMAN_REVIEW` | `ANALYST` | Evidence is incomplete, low-confidence, or conflicting. |
+| `HUMAN_REVIEW` | `RESOLVED` | `ANALYST` | Analyst resolves the case using policy rules and structured evidence. |
+| `RESOLVED` | `APPEALED` | `CARD_MEMBER` | Card member appeals the decision. |
+| `RESOLVED` | `APPEALED` | `MERCHANT` | Merchant appeals the decision. |
+| `APPEALED` | `HUMAN_REVIEW` | `ANALYST` | Analyst accepts the appeal for review. |
+| `APPEALED` | `CLOSED` | `ANALYST` | Analyst rejects or finalizes the appeal. |
+| `RESOLVED` | `CLOSED` | `ANALYST` | Case is finalized after the appeal window or final analyst action. |
+
+## Invariants
+- AI models cannot transition a case to `RESOLVED`.
+- `RESOLVED` requires deterministic policy output and structured evidence references.
+- Low-confidence or conflicting evidence must transition to `HUMAN_REVIEW`.
+- `CLOSED` is terminal.
