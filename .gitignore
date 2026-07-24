@@ -14,11 +14,8 @@ coverage/
 # Environment files
 .env
 .env.*
-!.env.example
-!frontend/.env.example
-!backend/.env.example
 !backend/.env
-!ai-service/.env.example
+!ai-service/.env
 
 # Local storage and uploads
 uploads/
