@@ -37,3 +37,7 @@ Thumbs.db
 
 # Prisma generated local artifacts
 backend/prisma/dev.db
+.env
+.env.*
+.env
+.env.*
