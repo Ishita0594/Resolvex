@@ -13,12 +13,94 @@ enum Role {
   ANALYST
 }
 
+enum ReasonCode {
+  GOODS_NOT_RECEIVED
+  REFUND_NOT_PROCESSED
+  CANCELLED_GOODS_OR_SERVICES
+}
+
+enum CaseStatus {
+  DRAFT
+  SUBMITTED
+  AWAITING_MERCHANT
+  EVIDENCE_PROCESSING
+  UNDER_EVALUATION
+  HUMAN_REVIEW
+  RESOLVED
+  APPEALED
+  CLOSED
+}
+
 model User {
-  id           String   @id @default(uuid()) @db.Uuid
-  name         String
-  email        String   @unique
-  passwordHash String
-  role         Role
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                         String          @id @default(uuid()) @db.Uuid
+  name                       String
+  email                      String          @unique
+  passwordHash               String
+  role                       Role
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  cardMemberTransactions     Transaction[]   @relation("CardMemberTransactions")
+  merchantTransactions       Transaction[]   @relation("MerchantTransactions")
+  cardMemberDisputeCases     DisputeCase[]   @relation("CardMemberDisputeCases")
+  merchantDisputeCases       DisputeCase[]   @relation("MerchantDisputeCases")
+  performedTimelineEvents    TimelineEvent[] @relation("PerformedTimelineEvents")
+}
+
+model Transaction {
+  id              String        @id @default(uuid()) @db.Uuid
+  cardMemberId    String        @db.Uuid
+  merchantId      String        @db.Uuid
+  merchantName    String
+  amount          Decimal       @db.Decimal(12, 2)
+  currency        String
+  transactionDate DateTime
+  status          String
+  maskedCardLast4 String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  cardMember      User          @relation("CardMemberTransactions", fields: [cardMemberId], references: [id])
+  merchant        User          @relation("MerchantTransactions", fields: [merchantId], references: [id])
+  disputeCases    DisputeCase[]
+
+  @@index([cardMemberId])
+  @@index([merchantId])
+}
+
+model DisputeCase {
+  id                  String          @id @default(uuid()) @db.Uuid
+  transactionId       String          @db.Uuid
+  cardMemberId        String          @db.Uuid
+  merchantId          String          @db.Uuid
+  reasonCode          ReasonCode
+  cardMemberStatement String
+  merchantStatement   String?
+  status              CaseStatus
+  responseDeadline    DateTime
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  resolvedAt          DateTime?
+  transaction         Transaction     @relation(fields: [transactionId], references: [id])
+  cardMember          User            @relation("CardMemberDisputeCases", fields: [cardMemberId], references: [id])
+  merchant            User            @relation("MerchantDisputeCases", fields: [merchantId], references: [id])
+  timelineEvents      TimelineEvent[]
+
+  @@index([cardMemberId])
+  @@index([merchantId])
+  @@index([transactionId])
+  @@index([status])
+}
+
+model TimelineEvent {
+  id          String      @id @default(uuid()) @db.Uuid
+  caseId      String      @db.Uuid
+  eventType   String
+  description String
+  performedBy String?     @db.Uuid
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+  case        DisputeCase @relation(fields: [caseId], references: [id])
+  performer   User?       @relation("PerformedTimelineEvents", fields: [performedBy], references: [id])
+
+  @@index([caseId])
+  @@index([performedBy])
 }

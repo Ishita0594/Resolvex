@@ -6,6 +6,7 @@ export interface ValidatedEnvironment {
   DATABASE_URL: string;
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
+  DISPUTE_MERCHANT_RESPONSE_DAYS: number;
 }
 
 export function validateEnv(config: Environment): ValidatedEnvironment {
@@ -25,11 +26,17 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     throw new Error('PORT must be a positive integer');
   }
 
+  const disputeMerchantResponseDays = Number(config.DISPUTE_MERCHANT_RESPONSE_DAYS ?? 7);
+  if (!Number.isInteger(disputeMerchantResponseDays) || disputeMerchantResponseDays <= 0) {
+    throw new Error('DISPUTE_MERCHANT_RESPONSE_DAYS must be a positive integer');
+  }
+
   return {
     NODE_ENV: config.NODE_ENV ?? 'development',
     PORT: port,
     DATABASE_URL: config.DATABASE_URL as string,
     JWT_SECRET: config.JWT_SECRET as string,
     JWT_EXPIRES_IN: config.JWT_EXPIRES_IN ?? '1h',
+    DISPUTE_MERCHANT_RESPONSE_DAYS: disputeMerchantResponseDays,
   };
 }
