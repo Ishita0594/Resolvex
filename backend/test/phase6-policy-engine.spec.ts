@@ -6,19 +6,19 @@ import {
   ReasonCode,
   RecommendedOutcome,
   Role,
-} from "@prisma/client";
-import { PolicyEvaluationService } from "../src/disputes/policy-evaluation.service";
-import { UserRole } from "../src/users/user-role.enum";
+} from '@prisma/client';
+import { PolicyEvaluationService } from '../src/disputes/policy-evaluation.service';
+import { UserRole } from '../src/users/user-role.enum';
 
 type MutablePolicyFixture = ReturnType<typeof buildFixture>;
 
-describe("Phase 6 deterministic policy engine", () => {
+describe('Phase 6 deterministic policy engine', () => {
   it.each([
     [ReasonCode.GOODS_NOT_RECEIVED, clearGoodsCardMemberCase],
     [ReasonCode.REFUND_NOT_PROCESSED, clearRefundCardMemberCase],
     [ReasonCode.CANCELLED_GOODS_OR_SERVICES, clearCancellationCardMemberCase],
   ])(
-    "supports a clear card-member outcome for %s",
+    'supports a clear card-member outcome for %s',
     async (reasonCode, buildCase) => {
       const fixture = buildFixture(buildCase());
       const result = await fixture.service.evaluate(
@@ -46,7 +46,7 @@ describe("Phase 6 deterministic policy engine", () => {
     [ReasonCode.REFUND_NOT_PROCESSED, clearRefundMerchantCase],
     [ReasonCode.CANCELLED_GOODS_OR_SERVICES, clearCancellationMerchantCase],
   ])(
-    "supports a clear merchant outcome for %s",
+    'supports a clear merchant outcome for %s',
     async (reasonCode, buildCase) => {
       const fixture = buildFixture(buildCase());
       const result = await fixture.service.evaluate(
@@ -70,7 +70,7 @@ describe("Phase 6 deterministic policy engine", () => {
     [ReasonCode.REFUND_NOT_PROCESSED, ambiguousRefundCase],
     [ReasonCode.CANCELLED_GOODS_OR_SERVICES, ambiguousCancellationCase],
   ])(
-    "routes ambiguous %s evidence to human review",
+    'routes ambiguous %s evidence to human review',
     async (_reasonCode, buildCase) => {
       const fixture = buildFixture(buildCase());
       const result = await fixture.service.evaluate(
@@ -85,14 +85,14 @@ describe("Phase 6 deterministic policy engine", () => {
     },
   );
 
-  it("scores the same evidence quality standards for both sides", async () => {
+  it('scores the same evidence quality standards for both sides', async () => {
     const disputeCase = clearRefundCardMemberCase();
     disputeCase.evidenceItems = [
-      evidence("e1", Role.CARD_MEMBER, "refund_promise", [
-        fact("REFUND_PROMISED", "true"),
+      evidence('e1', Role.CARD_MEMBER, 'refund_promise', [
+        fact('REFUND_PROMISED', 'true'),
       ]),
-      evidence("e2", Role.MERCHANT, "refund_promise", [
-        fact("REFUND_PROMISED", "true"),
+      evidence('e2', Role.MERCHANT, 'refund_promise', [
+        fact('REFUND_PROMISED', 'true'),
       ]),
     ];
     const fixture = buildFixture(disputeCase);
@@ -105,7 +105,7 @@ describe("Phase 6 deterministic policy engine", () => {
     );
   });
 
-  it("includes mandatory missing evidence in human-review explanations", async () => {
+  it('includes mandatory missing evidence in human-review explanations', async () => {
     const fixture = buildFixture({
       ...clearRefundCardMemberCase(),
       evidenceItems: [],
@@ -120,14 +120,14 @@ describe("Phase 6 deterministic policy engine", () => {
       RecommendedOutcome.HUMAN_REVIEW_REQUIRED,
     );
     expect(result.explanationData.missingEvidence).toEqual(
-      expect.arrayContaining(["Purchase Record"]),
+      expect.arrayContaining(['Purchase Record']),
     );
     expect(result.explanationData.humanReviewReason).toContain(
-      "confidence 0 is below threshold 85",
+      'confidence 0 is below threshold 85',
     );
   });
 
-  it("respects the configurable confidence threshold gate", async () => {
+  it('respects the configurable confidence threshold gate', async () => {
     const fixture = buildFixture(clearGoodsMerchantCase(), {
       POLICY_AUTO_CONFIDENCE_THRESHOLD: 97,
     });
@@ -141,14 +141,14 @@ describe("Phase 6 deterministic policy engine", () => {
       RecommendedOutcome.HUMAN_REVIEW_REQUIRED,
     );
     expect(result.explanationData.humanReviewReason).toContain(
-      "confidence 96 is below threshold 97",
+      'confidence 96 is below threshold 97',
     );
   });
 
-  it("blocks automation when critical facts are below required confidence", async () => {
+  it('blocks automation when critical facts are below required confidence', async () => {
     const lowConfidenceCase = clearRefundMerchantCase();
     lowConfidenceCase.evidenceItems[0].extractedFacts = [
-      fact("REFUND_COMPLETED", "true", {
+      fact('REFUND_COMPLETED', 'true', {
         confidence: 0.62,
         verifiedByUser: false,
       }),
@@ -164,11 +164,11 @@ describe("Phase 6 deterministic policy engine", () => {
       RecommendedOutcome.HUMAN_REVIEW_REQUIRED,
     );
     expect(result.explanationData.humanReviewReason).toContain(
-      "critical facts need verification",
+      'critical facts need verification',
     );
   });
 
-  it("persists contradiction scores as contradictory and requires review", async () => {
+  it('persists contradiction scores as contradictory and requires review', async () => {
     const fixture = buildFixture(ambiguousRefundCase());
 
     const result = await fixture.service.evaluate(
@@ -182,10 +182,10 @@ describe("Phase 6 deterministic policy engine", () => {
     expect(
       fixture.evidenceScores.map((score) => score.supportDirection),
     ).toContain(EvidenceSupportDirection.CONTRADICTORY);
-    expect(result.explanationData.contradictions[0].severity).toBe("HIGH");
+    expect(result.explanationData.contradictions[0].severity).toBe('HIGH');
   });
 
-  it("is deterministic across repeated evaluations and stores the policy version", async () => {
+  it('is deterministic across repeated evaluations and stores the policy version', async () => {
     const fixture = buildFixture(clearGoodsMerchantCase());
 
     const first = await fixture.service.evaluate(
@@ -198,12 +198,12 @@ describe("Phase 6 deterministic policy engine", () => {
     );
 
     expect(stableDecision(first)).toEqual(stableDecision(second));
-    expect(first.policyVersion).toBe("prototype-v1");
+    expect(first.policyVersion).toBe('prototype-v1');
     expect(first.decisionType).toBe(DecisionType.AUTOMATED_RECOMMENDATION);
     expect(fixture.decisionRecords).toHaveLength(2);
   });
 
-  it("returns the latest evaluation, evidence matrix, and structured explanation", async () => {
+  it('returns the latest evaluation, evidence matrix, and structured explanation', async () => {
     const fixture = buildFixture(clearGoodsMerchantCase());
     await fixture.service.evaluate(fixture.disputeCase.id, analystUser());
 
@@ -228,7 +228,7 @@ describe("Phase 6 deterministic policy engine", () => {
         (requirement) => requirement.evidenceScores.length > 0,
       ),
     ).toBe(true);
-    expect(explanation.appliedRuleIdentifiers).toContain("PX-GNR-002");
+    expect(explanation.appliedRuleIdentifiers).toContain('PX-GNR-002');
   });
 });
 
@@ -254,10 +254,10 @@ function buildFixture(
     },
     decisionRecord: {
       create: jest.fn(
-        ({ data }: { data: Omit<TestDecisionRecord, "id" | "createdAt"> }) => {
+        ({ data }: { data: Omit<TestDecisionRecord, 'id' | 'createdAt'> }) => {
           const record = {
             id: `decision-${decisionRecords.length + 1}`,
-            createdAt: new Date("2026-07-25T00:00:00.000Z"),
+            createdAt: new Date('2026-07-25T00:00:00.000Z'),
             ...data,
           };
           decisionRecords.push(record);
@@ -309,7 +309,7 @@ function buildFixture(
       findMany: jest.fn(() =>
         evidenceScores.map((score) => ({
           ...score,
-          createdAt: new Date("2026-07-25T00:00:00.000Z"),
+          createdAt: new Date('2026-07-25T00:00:00.000Z'),
           evidence: disputeCase.evidenceItems.find(
             (item) => item.id === score.evidenceId,
           ),
@@ -345,91 +345,91 @@ function buildFixture(
 
 function clearGoodsCardMemberCase(): TestDisputeCase {
   return baseCase(ReasonCode.GOODS_NOT_RECEIVED, [
-    evidence("cm-gnr-1", Role.CARD_MEMBER, "non_delivery_statement", [
-      fact("NON_DELIVERY_STATEMENT", "true"),
+    evidence('cm-gnr-1', Role.CARD_MEMBER, 'non_delivery_statement', [
+      fact('NON_DELIVERY_STATEMENT', 'true'),
     ]),
-    evidence("m-gnr-1", Role.MERCHANT, "dispatch_record", [
-      fact("DISPATCHED", "true"),
+    evidence('m-gnr-1', Role.MERCHANT, 'dispatch_record', [
+      fact('DISPATCHED', 'true'),
     ]),
   ]);
 }
 
 function clearGoodsMerchantCase(): TestDisputeCase {
   return baseCase(ReasonCode.GOODS_NOT_RECEIVED, [
-    evidence("m-gnr-2", Role.MERCHANT, "delivery_confirmation", [
-      fact("DELIVERY_CONFIRMED", "true"),
-      fact("DELIVERY_LOCATION_MATCH", "true"),
+    evidence('m-gnr-2', Role.MERCHANT, 'delivery_confirmation', [
+      fact('DELIVERY_CONFIRMED', 'true'),
+      fact('DELIVERY_LOCATION_MATCH', 'true'),
     ]),
   ]);
 }
 
 function ambiguousGoodsCase(): TestDisputeCase {
   return baseCase(ReasonCode.GOODS_NOT_RECEIVED, [
-    evidence("m-gnr-3", Role.MERCHANT, "delivery_confirmation", [
-      fact("DELIVERY_CONFIRMED", "true"),
-      fact("DELIVERY_LOCATION", "front porch"),
+    evidence('m-gnr-3', Role.MERCHANT, 'delivery_confirmation', [
+      fact('DELIVERY_CONFIRMED', 'true'),
+      fact('DELIVERY_LOCATION', 'front porch'),
     ]),
-    evidence("cm-gnr-3", Role.CARD_MEMBER, "location_dispute", [
-      fact("DELIVERY_LOCATION", "mail room"),
+    evidence('cm-gnr-3', Role.CARD_MEMBER, 'location_dispute', [
+      fact('DELIVERY_LOCATION', 'mail room'),
     ]),
   ]);
 }
 
 function clearRefundCardMemberCase(): TestDisputeCase {
   return baseCase(ReasonCode.REFUND_NOT_PROCESSED, [
-    evidence("cm-ref-1", Role.CARD_MEMBER, "refund_promise", [
-      fact("REFUND_PROMISED", "true"),
+    evidence('cm-ref-1', Role.CARD_MEMBER, 'refund_promise', [
+      fact('REFUND_PROMISED', 'true'),
     ]),
   ]);
 }
 
 function clearRefundMerchantCase(): TestDisputeCase {
   return baseCase(ReasonCode.REFUND_NOT_PROCESSED, [
-    evidence("m-ref-1", Role.MERCHANT, "completed_refund_transaction", [
-      fact("REFUND_COMPLETED", "true"),
-      fact("REFUND_AMOUNT", "249.99"),
-      fact("REFUND_REFERENCE", "RF-100"),
+    evidence('m-ref-1', Role.MERCHANT, 'completed_refund_transaction', [
+      fact('REFUND_COMPLETED', 'true'),
+      fact('REFUND_AMOUNT', '249.99'),
+      fact('REFUND_REFERENCE', 'RF-100'),
     ]),
   ]);
 }
 
 function ambiguousRefundCase(): TestDisputeCase {
   return baseCase(ReasonCode.REFUND_NOT_PROCESSED, [
-    evidence("m-ref-2", Role.MERCHANT, "completed_refund_transaction", [
-      fact("REFUND_COMPLETED", "true"),
-      fact("REFUND_AMOUNT", "249.99"),
+    evidence('m-ref-2', Role.MERCHANT, 'completed_refund_transaction', [
+      fact('REFUND_COMPLETED', 'true'),
+      fact('REFUND_AMOUNT', '249.99'),
     ]),
-    evidence("cm-ref-2", Role.CARD_MEMBER, "refund_amount_dispute", [
-      fact("REFUND_AMOUNT", "199.99"),
+    evidence('cm-ref-2', Role.CARD_MEMBER, 'refund_amount_dispute', [
+      fact('REFUND_AMOUNT', '199.99'),
     ]),
   ]);
 }
 
 function clearCancellationCardMemberCase(): TestDisputeCase {
   return baseCase(ReasonCode.CANCELLED_GOODS_OR_SERVICES, [
-    evidence("cm-can-1", Role.CARD_MEMBER, "cancellation_proof", [
-      fact("CANCELLATION_TIMELY", "true"),
-      fact("CANCELLATION_VALID", "true"),
-      fact("SERVICE_DELIVERED", "false"),
-      fact("REFUND_PROVIDED", "false"),
-      fact("POLICY_ACCEPTED", "false"),
+    evidence('cm-can-1', Role.CARD_MEMBER, 'cancellation_proof', [
+      fact('CANCELLATION_TIMELY', 'true'),
+      fact('CANCELLATION_VALID', 'true'),
+      fact('SERVICE_DELIVERED', 'false'),
+      fact('REFUND_PROVIDED', 'false'),
+      fact('POLICY_ACCEPTED', 'false'),
     ]),
   ]);
 }
 
 function clearCancellationMerchantCase(): TestDisputeCase {
   return baseCase(ReasonCode.CANCELLED_GOODS_OR_SERVICES, [
-    evidence("m-can-1", Role.MERCHANT, "terms_acceptance", [
-      fact("CANCELLATION_TIMELY", "false"),
-      fact("POLICY_ACCEPTED", "true"),
+    evidence('m-can-1', Role.MERCHANT, 'terms_acceptance', [
+      fact('CANCELLATION_TIMELY', 'false'),
+      fact('POLICY_ACCEPTED', 'true'),
     ]),
   ]);
 }
 
 function ambiguousCancellationCase(): TestDisputeCase {
   return baseCase(ReasonCode.CANCELLED_GOODS_OR_SERVICES, [
-    evidence("cm-can-2", Role.CARD_MEMBER, "cancellation_proof", [
-      fact("CANCELLATION_VALID", "true"),
+    evidence('cm-can-2', Role.CARD_MEMBER, 'cancellation_proof', [
+      fact('CANCELLATION_VALID', 'true'),
     ]),
   ]);
 }
@@ -439,18 +439,18 @@ function baseCase(
   evidenceItems: TestEvidenceItem[],
 ): TestDisputeCase {
   return {
-    id: "case-1",
-    cardMemberId: "card-member-1",
-    merchantId: "merchant-1",
+    id: 'case-1',
+    cardMemberId: 'card-member-1',
+    merchantId: 'merchant-1',
     reasonCode,
-    cardMemberStatement: "Card member statement",
-    merchantStatement: "Merchant statement",
-    createdAt: new Date("2026-07-20T00:00:00.000Z"),
+    cardMemberStatement: 'Card member statement',
+    merchantStatement: 'Merchant statement',
+    createdAt: new Date('2026-07-20T00:00:00.000Z'),
     transaction: {
-      amount: new Prisma.Decimal("249.99"),
-      currency: "USD",
-      transactionDate: new Date("2026-07-01T00:00:00.000Z"),
-      merchantName: "Northstar Electronics",
+      amount: new Prisma.Decimal('249.99'),
+      currency: 'USD',
+      transactionDate: new Date('2026-07-01T00:00:00.000Z'),
+      merchantName: 'Northstar Electronics',
     },
     evidenceItems,
   };
@@ -464,20 +464,20 @@ function evidence(
 ): TestEvidenceItem {
   return {
     id,
-    caseId: "case-1",
+    caseId: 'case-1',
     submittedByUserId:
-      submittedByRole === Role.MERCHANT ? "merchant-1" : "card-member-1",
+      submittedByRole === Role.MERCHANT ? 'merchant-1' : 'card-member-1',
     submittedByRole,
     evidenceType,
     fileName: `${id}.pdf`,
-    mimeType: "application/pdf",
+    mimeType: 'application/pdf',
     sizeBytes: 100,
     storageKey: `evidence/case-1/${id}.pdf`,
-    fileHash: "a".repeat(64),
+    fileHash: 'a'.repeat(64),
     processingStatus: EvidenceProcessingStatus.PROCESSED,
     extractionConfidence: 0.95,
-    createdAt: new Date("2026-07-15T00:00:00.000Z"),
-    updatedAt: new Date("2026-07-15T00:00:00.000Z"),
+    createdAt: new Date('2026-07-15T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-15T00:00:00.000Z'),
     extractedFacts,
   };
 }
@@ -489,7 +489,7 @@ function fact(
 ): TestExtractedFact {
   return {
     id: `${factType}-${factValue}`,
-    evidenceId: "",
+    evidenceId: '',
     factType,
     factValue,
     normalizedValue: factValue,
@@ -497,8 +497,8 @@ function fact(
     sourcePage: null,
     verifiedByUser: options.verifiedByUser ?? true,
     correctedByUser: false,
-    createdAt: new Date("2026-07-15T00:00:00.000Z"),
-    updatedAt: new Date("2026-07-15T00:00:00.000Z"),
+    createdAt: new Date('2026-07-15T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-15T00:00:00.000Z'),
   };
 }
 
@@ -512,66 +512,66 @@ function requirementsFor(reasonCode: ReasonCode): TestRequirement[] {
     reasonCode,
     requirementKey,
     requirementName: requirementKey
-      .split("_")
+      .split('_')
       .map((part) => part[0].toUpperCase() + part.slice(1))
-      .join(" "),
+      .join(' '),
     description: `Prototype assumption for ${requirementKey}.`,
     acceptedEvidenceTypes,
     weight: 20,
     isMandatory,
-    policyVersion: "prototype-v1",
+    policyVersion: 'prototype-v1',
     active: true,
-    createdAt: new Date("2026-07-01T00:00:00.000Z"),
-    updatedAt: new Date("2026-07-01T00:00:00.000Z"),
+    createdAt: new Date('2026-07-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-01T00:00:00.000Z'),
   });
 
   if (reasonCode === ReasonCode.GOODS_NOT_RECEIVED) {
     return [
-      base("dispatch_record", ["dispatch_record"]),
-      base("delivery_confirmation", [
-        "delivery_confirmation",
-        "non_delivery_statement",
+      base('dispatch_record', ['dispatch_record']),
+      base('delivery_confirmation', [
+        'delivery_confirmation',
+        'non_delivery_statement',
       ]),
-      base("verified_delivery_location", ["location_dispute"], false),
+      base('verified_delivery_location', ['location_dispute'], false),
     ];
   }
 
   if (reasonCode === ReasonCode.REFUND_NOT_PROCESSED) {
     return [
-      base("purchase_record", ["purchase_record"]),
-      base("refund_initiation_record", ["refund_promise"]),
+      base('purchase_record', ['purchase_record']),
+      base('refund_initiation_record', ['refund_promise']),
       base(
-        "completed_refund_transaction",
-        ["completed_refund_transaction"],
+        'completed_refund_transaction',
+        ['completed_refund_transaction'],
         false,
       ),
-      base("refund_amount", ["refund_amount_dispute"], false),
+      base('refund_amount', ['refund_amount_dispute'], false),
     ];
   }
 
   return [
-    base("cancellation_request", ["cancellation_proof"]),
-    base("accepted_cancellation_policy", ["terms_acceptance"]),
+    base('cancellation_request', ['cancellation_proof']),
+    base('accepted_cancellation_policy', ['terms_acceptance']),
   ];
 }
 
 function rulesFor(reasonCode: ReasonCode): TestRule[] {
   const idsByReason = {
     [ReasonCode.GOODS_NOT_RECEIVED]: [
-      "PX-GNR-001",
-      "PX-GNR-002",
-      "PX-GNR-003",
-      "PX-GNR-004",
+      'PX-GNR-001',
+      'PX-GNR-002',
+      'PX-GNR-003',
+      'PX-GNR-004',
     ],
     [ReasonCode.REFUND_NOT_PROCESSED]: [
-      "PX-REF-001",
-      "PX-REF-002",
-      "PX-REF-003",
+      'PX-REF-001',
+      'PX-REF-002',
+      'PX-REF-003',
     ],
     [ReasonCode.CANCELLED_GOODS_OR_SERVICES]: [
-      "PX-CAN-001",
-      "PX-CAN-002",
-      "PX-CAN-003",
+      'PX-CAN-001',
+      'PX-CAN-002',
+      'PX-CAN-003',
     ],
   };
 
@@ -582,34 +582,34 @@ function rulesFor(reasonCode: ReasonCode): TestRule[] {
     title: ruleId,
     description: `Prototype assumption ${ruleId}.`,
     prototypeAssumption: true,
-    severity: "HIGH",
-    policyVersion: "prototype-v1",
+    severity: 'HIGH',
+    policyVersion: 'prototype-v1',
     active: true,
-    createdAt: new Date("2026-07-01T00:00:00.000Z"),
-    updatedAt: new Date("2026-07-01T00:00:00.000Z"),
+    createdAt: new Date('2026-07-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-01T00:00:00.000Z'),
   }));
 }
 
 function analystUser() {
   return {
-    id: "analyst-1",
-    name: "Analyst",
+    id: 'analyst-1',
+    name: 'Analyst',
     role: UserRole.ANALYST,
-    email: "analyst@test.local",
+    email: 'analyst@test.local',
   };
 }
 
 function merchantUser() {
   return {
-    id: "merchant-1",
-    name: "Merchant",
+    id: 'merchant-1',
+    name: 'Merchant',
     role: UserRole.MERCHANT,
-    email: "merchant@test.local",
+    email: 'merchant@test.local',
   };
 }
 
 function stableDecision(
-  response: Awaited<ReturnType<MutablePolicyFixture["service"]["evaluate"]>>,
+  response: Awaited<ReturnType<MutablePolicyFixture['service']['evaluate']>>,
 ) {
   return {
     recommendedOutcome: response.recommendedOutcome,

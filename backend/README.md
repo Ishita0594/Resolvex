@@ -35,6 +35,9 @@ Phase 6 stores prototype `PolicyRule`, `EvidenceScore`, and `DecisionRecord` dat
 
 Automatic recommendations use deterministic prototype rules only. The default gate is `POLICY_AUTO_CONFIDENCE_THRESHOLD=85`, `POLICY_AUTO_DECISION_MARGIN_THRESHOLD=20`, and `POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD=0.8`.
 
+## Analyst Review and Events
+Phase 7 adds analyst review decisions, audit logs, user notifications, and the authenticated Socket.IO namespace `/case-events`. Event payloads contain case IDs, status labels, and safe display metadata only.
+
 ## Commands
 ```powershell
 npm run start:dev

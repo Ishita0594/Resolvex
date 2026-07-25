@@ -2,8 +2,9 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
+  Optional,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   DecisionType,
   EvidenceItem,
@@ -16,12 +17,13 @@ import {
   ReasonCode,
   RecommendedOutcome,
   Role,
-} from "@prisma/client";
-import { PrismaService } from "../prisma/prisma.service";
-import { PublicUser } from "../users/public-user.type";
-import { UserRole } from "../users/user-role.enum";
+} from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { PublicUser } from '../users/public-user.type';
+import { UserRole } from '../users/user-role.enum';
+import { CaseEventsGateway } from '../events/case-events.gateway';
 
-const POLICY_VERSION = "prototype-v1";
+const POLICY_VERSION = 'prototype-v1';
 const QUALITY_WEIGHTS = {
   sourceReliability: 0.25,
   directness: 0.25,
@@ -37,6 +39,7 @@ type CaseForEvaluation = {
   cardMemberId: string;
   merchantId: string;
   reasonCode: ReasonCode;
+  status: string;
   cardMemberStatement: string;
   merchantStatement: string | null;
   createdAt: Date;
@@ -76,7 +79,7 @@ type FactView = {
 
 type Contradiction = {
   factType: string;
-  severity: "LOW" | "HIGH";
+  severity: 'LOW' | 'HIGH';
   values: string[];
   evidenceIds: string[];
   description: string;
@@ -86,10 +89,10 @@ type RuleResult = {
   ruleId: string;
   applied: boolean;
   effect:
-    | "SUPPORTS_CARD_MEMBER"
-    | "SUPPORTS_MERCHANT"
-    | "REQUIRES_REVIEW"
-    | "LIMITS_MERCHANT_SUPPORT";
+    | 'SUPPORTS_CARD_MEMBER'
+    | 'SUPPORTS_MERCHANT'
+    | 'REQUIRES_REVIEW'
+    | 'LIMITS_MERCHANT_SUPPORT';
   scoreImpact: number;
   evidenceIds: string[];
   criticalFactTypes: string[];
@@ -156,6 +159,7 @@ export class PolicyEvaluationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    @Optional() private readonly caseEventsGateway?: CaseEventsGateway,
   ) {}
 
   async evaluate(
@@ -163,7 +167,7 @@ export class PolicyEvaluationService {
     user: PublicUser,
   ): Promise<EvaluationResponse> {
     if (user.role !== UserRole.ANALYST) {
-      throw new ForbiddenException("Only analysts can run policy evaluation");
+      throw new ForbiddenException('Only analysts can run policy evaluation');
     }
 
     const evaluationCase = await this.findVisibleCase(caseId, user);
@@ -231,8 +235,8 @@ export class PolicyEvaluationService {
       await tx.timelineEvent.create({
         data: {
           caseId: evaluationCase.id,
-          eventType: "POLICY_EVALUATION_COMPLETED",
-          description: "Deterministic prototype policy evaluation completed.",
+          eventType: 'POLICY_EVALUATION_COMPLETED',
+          description: 'Deterministic prototype policy evaluation completed.',
           performedBy: user.id,
           metadata: {
             decisionRecordId: createdDecision.id,
@@ -247,6 +251,39 @@ export class PolicyEvaluationService {
       return createdDecision;
     });
 
+    await this.caseEventsGateway?.emitCaseEvent(
+      evaluationCase.id,
+      'decision.generated',
+      {
+        caseId: evaluationCase.id,
+        newStatus: evaluationCase.status,
+        title: 'Decision generated',
+        metadata: {
+          recommendedOutcome: evaluation.recommendedOutcome,
+          confidence: evaluation.confidence,
+          decisionMargin: evaluation.decisionMargin,
+        },
+      },
+    );
+
+    if (
+      evaluation.recommendedOutcome === RecommendedOutcome.HUMAN_REVIEW_REQUIRED
+    ) {
+      await this.caseEventsGateway?.emitCaseEvent(
+        evaluationCase.id,
+        'analyst.review.required',
+        {
+          caseId: evaluationCase.id,
+          newStatus: evaluationCase.status,
+          title: 'Analyst review required',
+          metadata: {
+            confidence: evaluation.confidence,
+            decisionMargin: evaluation.decisionMargin,
+          },
+        },
+      );
+    }
+
     return serializeDecisionRecord(decisionRecord);
   }
 
@@ -257,11 +294,11 @@ export class PolicyEvaluationService {
     await this.findVisibleCase(caseId, user);
     const decisionRecord = await this.prisma.decisionRecord.findFirst({
       where: { caseId },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
     });
 
     if (!decisionRecord) {
-      throw new NotFoundException("Evaluation not found");
+      throw new NotFoundException('Evaluation not found');
     }
 
     return serializeDecisionRecord(decisionRecord);
@@ -276,7 +313,7 @@ export class PolicyEvaluationService {
     const persistedScores = await this.prisma.evidenceScore.findMany({
       where: { caseId },
       include: { evidence: true },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: 'asc' },
     });
 
     const scoresByRequirement = new Map<
@@ -337,7 +374,7 @@ export class PolicyEvaluationService {
     } else if (user.role === UserRole.MERCHANT) {
       where.merchantId = user.id;
     } else if (user.role !== UserRole.ANALYST) {
-      throw new ForbiddenException("Unsupported user role");
+      throw new ForbiddenException('Unsupported user role');
     }
 
     const disputeCase = await this.prisma.disputeCase.findFirst({
@@ -346,13 +383,13 @@ export class PolicyEvaluationService {
         transaction: true,
         evidenceItems: {
           include: { extractedFacts: true },
-          orderBy: { createdAt: "asc" },
+          orderBy: { createdAt: 'asc' },
         },
       },
     });
 
     if (!disputeCase) {
-      throw new NotFoundException("Dispute case not found");
+      throw new NotFoundException('Dispute case not found');
     }
 
     return disputeCase;
@@ -363,14 +400,14 @@ export class PolicyEvaluationService {
   ): Promise<PolicyRequirement[]> {
     return this.prisma.policyRequirement.findMany({
       where: { reasonCode, active: true, policyVersion: POLICY_VERSION },
-      orderBy: [{ isMandatory: "desc" }, { requirementKey: "asc" }],
+      orderBy: [{ isMandatory: 'desc' }, { requirementKey: 'asc' }],
     });
   }
 
   private async findRules(reasonCode: ReasonCode): Promise<PolicyRule[]> {
     return this.prisma.policyRule.findMany({
       where: { reasonCode, active: true, policyVersion: POLICY_VERSION },
-      orderBy: { ruleId: "asc" },
+      orderBy: { ruleId: 'asc' },
     });
   }
 
@@ -390,13 +427,13 @@ export class PolicyEvaluationService {
   private findContradictions(facts: FactView[]): Contradiction[] {
     const contradictions: Contradiction[] = [];
     const declared = facts.filter(
-      (fact) => fact.factType === "HIGH_SEVERITY_CONTRADICTION",
+      (fact) => fact.factType === 'HIGH_SEVERITY_CONTRADICTION',
     );
 
     for (const fact of declared) {
       contradictions.push({
         factType: fact.factType,
-        severity: "HIGH",
+        severity: 'HIGH',
         values: [fact.value],
         evidenceIds: [fact.evidenceId],
         description: fact.value,
@@ -404,13 +441,13 @@ export class PolicyEvaluationService {
     }
 
     for (const factType of [
-      "DELIVERY_LOCATION",
-      "RECIPIENT_NAME",
-      "REFUND_AMOUNT",
-      "REFUND_DATE",
-      "REFUND_REFERENCE",
-      "CANCELLATION_DATE",
-      "POLICY_ACCEPTED",
+      'DELIVERY_LOCATION',
+      'RECIPIENT_NAME',
+      'REFUND_AMOUNT',
+      'REFUND_DATE',
+      'REFUND_REFERENCE',
+      'CANCELLATION_DATE',
+      'POLICY_ACCEPTED',
     ]) {
       const group = facts.filter((fact) => fact.factType === factType);
       const distinctValues = Array.from(
@@ -419,7 +456,7 @@ export class PolicyEvaluationService {
       if (distinctValues.length > 1) {
         contradictions.push({
           factType,
-          severity: "HIGH",
+          severity: 'HIGH',
           values: distinctValues,
           evidenceIds: Array.from(
             new Set(group.map((fact) => fact.evidenceId)),
@@ -524,66 +561,66 @@ export class PolicyEvaluationService {
     facts: FactView[],
     contradictions: Contradiction[],
   ): RuleResult[] {
-    const deliveryConfirmed = hasTruthyFact(facts, "DELIVERY_CONFIRMED");
+    const deliveryConfirmed = hasTruthyFact(facts, 'DELIVERY_CONFIRMED');
     const dispatchOnly =
-      hasTruthyFact(facts, "DISPATCHED") && !deliveryConfirmed;
+      hasTruthyFact(facts, 'DISPATCHED') && !deliveryConfirmed;
     const recipientOrLocationConfirmed =
-      hasTruthyFact(facts, "RECIPIENT_CONFIRMED") ||
-      hasTruthyFact(facts, "DELIVERY_LOCATION_MATCH");
+      hasTruthyFact(facts, 'RECIPIENT_CONFIRMED') ||
+      hasTruthyFact(facts, 'DELIVERY_LOCATION_MATCH');
     const nonDeliveryEvidence =
-      hasTruthyFact(facts, "NON_DELIVERY_STATEMENT") ||
-      hasTruthyFact(facts, "DELIVERY_NOT_RECEIVED");
+      hasTruthyFact(facts, 'NON_DELIVERY_STATEMENT') ||
+      hasTruthyFact(facts, 'DELIVERY_NOT_RECEIVED');
     const identityConflict = contradictions.some((item) =>
       [
-        "DELIVERY_LOCATION",
-        "RECIPIENT_NAME",
-        "HIGH_SEVERITY_CONTRADICTION",
+        'DELIVERY_LOCATION',
+        'RECIPIENT_NAME',
+        'HIGH_SEVERITY_CONTRADICTION',
       ].includes(item.factType),
     );
 
     return [
       buildRule(
-        "PX-GNR-001",
+        'PX-GNR-001',
         dispatchOnly,
-        "LIMITS_MERCHANT_SUPPORT",
+        'LIMITS_MERCHANT_SUPPORT',
         0,
-        evidenceIdsFor(facts, ["DISPATCHED"]),
-        ["DISPATCHED"],
+        evidenceIdsFor(facts, ['DISPATCHED']),
+        ['DISPATCHED'],
       ),
       buildRule(
-        "PX-GNR-002",
+        'PX-GNR-002',
         deliveryConfirmed && recipientOrLocationConfirmed && !identityConflict,
-        "SUPPORTS_MERCHANT",
+        'SUPPORTS_MERCHANT',
         92,
         evidenceIdsFor(facts, [
-          "DELIVERY_CONFIRMED",
-          "RECIPIENT_CONFIRMED",
-          "DELIVERY_LOCATION_MATCH",
+          'DELIVERY_CONFIRMED',
+          'RECIPIENT_CONFIRMED',
+          'DELIVERY_LOCATION_MATCH',
         ]),
         [
-          "DELIVERY_CONFIRMED",
-          "RECIPIENT_CONFIRMED",
-          "DELIVERY_LOCATION_MATCH",
+          'DELIVERY_CONFIRMED',
+          'RECIPIENT_CONFIRMED',
+          'DELIVERY_LOCATION_MATCH',
         ],
       ),
       buildRule(
-        "PX-GNR-003",
+        'PX-GNR-003',
         !deliveryConfirmed && nonDeliveryEvidence && !identityConflict,
-        "SUPPORTS_CARD_MEMBER",
+        'SUPPORTS_CARD_MEMBER',
         90,
         evidenceIdsFor(facts, [
-          "NON_DELIVERY_STATEMENT",
-          "DELIVERY_NOT_RECEIVED",
+          'NON_DELIVERY_STATEMENT',
+          'DELIVERY_NOT_RECEIVED',
         ]),
-        ["NON_DELIVERY_STATEMENT", "DELIVERY_NOT_RECEIVED"],
+        ['NON_DELIVERY_STATEMENT', 'DELIVERY_NOT_RECEIVED'],
       ),
       buildRule(
-        "PX-GNR-004",
+        'PX-GNR-004',
         identityConflict,
-        "REQUIRES_REVIEW",
+        'REQUIRES_REVIEW',
         100,
         Array.from(new Set(contradictions.flatMap((item) => item.evidenceIds))),
-        ["DELIVERY_LOCATION", "RECIPIENT_NAME"],
+        ['DELIVERY_LOCATION', 'RECIPIENT_NAME'],
       ),
     ];
   }
@@ -592,46 +629,46 @@ export class PolicyEvaluationService {
     facts: FactView[],
     contradictions: Contradiction[],
   ): RuleResult[] {
-    const refundPromise = hasTruthyFact(facts, "REFUND_PROMISED");
-    const completedRefund = hasTruthyFact(facts, "REFUND_COMPLETED");
+    const refundPromise = hasTruthyFact(facts, 'REFUND_PROMISED');
+    const completedRefund = hasTruthyFact(facts, 'REFUND_COMPLETED');
     const refundConflict = contradictions.some((item) =>
       [
-        "REFUND_AMOUNT",
-        "REFUND_DATE",
-        "REFUND_REFERENCE",
-        "HIGH_SEVERITY_CONTRADICTION",
+        'REFUND_AMOUNT',
+        'REFUND_DATE',
+        'REFUND_REFERENCE',
+        'HIGH_SEVERITY_CONTRADICTION',
       ].includes(item.factType),
     );
 
     return [
       buildRule(
-        "PX-REF-001",
+        'PX-REF-001',
         refundPromise && !completedRefund && !refundConflict,
-        "SUPPORTS_CARD_MEMBER",
+        'SUPPORTS_CARD_MEMBER',
         91,
-        evidenceIdsFor(facts, ["REFUND_PROMISED"]),
-        ["REFUND_PROMISED"],
+        evidenceIdsFor(facts, ['REFUND_PROMISED']),
+        ['REFUND_PROMISED'],
       ),
       buildRule(
-        "PX-REF-002",
+        'PX-REF-002',
         completedRefund && !refundConflict,
-        "SUPPORTS_MERCHANT",
+        'SUPPORTS_MERCHANT',
         93,
         evidenceIdsFor(facts, [
-          "REFUND_COMPLETED",
-          "REFUND_AMOUNT",
-          "REFUND_DATE",
-          "REFUND_REFERENCE",
+          'REFUND_COMPLETED',
+          'REFUND_AMOUNT',
+          'REFUND_DATE',
+          'REFUND_REFERENCE',
         ]),
-        ["REFUND_COMPLETED"],
+        ['REFUND_COMPLETED'],
       ),
       buildRule(
-        "PX-REF-003",
+        'PX-REF-003',
         refundConflict,
-        "REQUIRES_REVIEW",
+        'REQUIRES_REVIEW',
         100,
         Array.from(new Set(contradictions.flatMap((item) => item.evidenceIds))),
-        ["REFUND_AMOUNT", "REFUND_DATE", "REFUND_REFERENCE"],
+        ['REFUND_AMOUNT', 'REFUND_DATE', 'REFUND_REFERENCE'],
       ),
     ];
   }
@@ -640,72 +677,72 @@ export class PolicyEvaluationService {
     facts: FactView[],
     contradictions: Contradiction[],
   ): RuleResult[] {
-    const timelyCancellation = hasTruthyFact(facts, "CANCELLATION_TIMELY");
-    const validCancellation = hasTruthyFact(facts, "CANCELLATION_VALID");
+    const timelyCancellation = hasTruthyFact(facts, 'CANCELLATION_TIMELY');
+    const validCancellation = hasTruthyFact(facts, 'CANCELLATION_VALID');
     const noServiceDelivery =
-      hasFalsyFact(facts, "SERVICE_DELIVERED") ||
-      hasTruthyFact(facts, "NO_SERVICE_DELIVERY");
+      hasFalsyFact(facts, 'SERVICE_DELIVERED') ||
+      hasTruthyFact(facts, 'NO_SERVICE_DELIVERY');
     const noRefund =
-      hasFalsyFact(facts, "REFUND_PROVIDED") ||
-      hasTruthyFact(facts, "NO_REFUND");
+      hasFalsyFact(facts, 'REFUND_PROVIDED') ||
+      hasTruthyFact(facts, 'NO_REFUND');
     const lateCancellation =
-      hasFalsyFact(facts, "CANCELLATION_TIMELY") ||
-      hasTruthyFact(facts, "LATE_CANCELLATION");
-    const acceptedPolicy = hasTruthyFact(facts, "POLICY_ACCEPTED");
+      hasFalsyFact(facts, 'CANCELLATION_TIMELY') ||
+      hasTruthyFact(facts, 'LATE_CANCELLATION');
+    const acceptedPolicy = hasTruthyFact(facts, 'POLICY_ACCEPTED');
     const unclearCancellation =
       contradictions.some((item) =>
         [
-          "CANCELLATION_DATE",
-          "POLICY_ACCEPTED",
-          "HIGH_SEVERITY_CONTRADICTION",
+          'CANCELLATION_DATE',
+          'POLICY_ACCEPTED',
+          'HIGH_SEVERITY_CONTRADICTION',
         ].includes(item.factType),
       ) ||
-      !hasAnyFact(facts, ["CANCELLATION_TIMELY", "LATE_CANCELLATION"]) ||
-      !hasAnyFact(facts, ["POLICY_ACCEPTED"]);
+      !hasAnyFact(facts, ['CANCELLATION_TIMELY', 'LATE_CANCELLATION']) ||
+      !hasAnyFact(facts, ['POLICY_ACCEPTED']);
 
     return [
       buildRule(
-        "PX-CAN-001",
+        'PX-CAN-001',
         timelyCancellation &&
           validCancellation &&
           noServiceDelivery &&
           noRefund,
-        "SUPPORTS_CARD_MEMBER",
+        'SUPPORTS_CARD_MEMBER',
         92,
         evidenceIdsFor(facts, [
-          "CANCELLATION_TIMELY",
-          "CANCELLATION_VALID",
-          "SERVICE_DELIVERED",
-          "NO_SERVICE_DELIVERY",
-          "REFUND_PROVIDED",
-          "NO_REFUND",
+          'CANCELLATION_TIMELY',
+          'CANCELLATION_VALID',
+          'SERVICE_DELIVERED',
+          'NO_SERVICE_DELIVERY',
+          'REFUND_PROVIDED',
+          'NO_REFUND',
         ]),
         [
-          "CANCELLATION_TIMELY",
-          "CANCELLATION_VALID",
-          "SERVICE_DELIVERED",
-          "REFUND_PROVIDED",
+          'CANCELLATION_TIMELY',
+          'CANCELLATION_VALID',
+          'SERVICE_DELIVERED',
+          'REFUND_PROVIDED',
         ],
       ),
       buildRule(
-        "PX-CAN-002",
+        'PX-CAN-002',
         lateCancellation && acceptedPolicy && !unclearCancellation,
-        "SUPPORTS_MERCHANT",
+        'SUPPORTS_MERCHANT',
         90,
         evidenceIdsFor(facts, [
-          "CANCELLATION_TIMELY",
-          "LATE_CANCELLATION",
-          "POLICY_ACCEPTED",
+          'CANCELLATION_TIMELY',
+          'LATE_CANCELLATION',
+          'POLICY_ACCEPTED',
         ]),
-        ["CANCELLATION_TIMELY", "POLICY_ACCEPTED"],
+        ['CANCELLATION_TIMELY', 'POLICY_ACCEPTED'],
       ),
       buildRule(
-        "PX-CAN-003",
+        'PX-CAN-003',
         unclearCancellation,
-        "REQUIRES_REVIEW",
+        'REQUIRES_REVIEW',
         100,
         Array.from(new Set(contradictions.flatMap((item) => item.evidenceIds))),
-        ["CANCELLATION_TIMELY", "POLICY_ACCEPTED"],
+        ['CANCELLATION_TIMELY', 'POLICY_ACCEPTED'],
       ),
     ];
   }
@@ -723,13 +760,13 @@ export class PolicyEvaluationService {
     const cardRuleScore = Math.max(
       0,
       ...appliedRuleResults
-        .filter((rule) => rule.effect === "SUPPORTS_CARD_MEMBER")
+        .filter((rule) => rule.effect === 'SUPPORTS_CARD_MEMBER')
         .map((rule) => rule.scoreImpact),
     );
     const merchantRuleScore = Math.max(
       0,
       ...appliedRuleResults
-        .filter((rule) => rule.effect === "SUPPORTS_MERCHANT")
+        .filter((rule) => rule.effect === 'SUPPORTS_MERCHANT')
         .map((rule) => rule.scoreImpact),
     );
     const cardEvidenceScore = averageScore(
@@ -793,7 +830,7 @@ export class PolicyEvaluationService {
       appliedRuleIdentifiers: appliedRuleResults.map((rule) => rule.ruleId),
       recommendedOutcome,
       confidence,
-      humanReviewReason: gate.passed ? null : gate.reasons.join("; "),
+      humanReviewReason: gate.passed ? null : gate.reasons.join('; '),
     };
 
     return {
@@ -826,15 +863,15 @@ export class PolicyEvaluationService {
   ): { passed: boolean; reasons: string[] } {
     const reasons: string[] = [];
     const confidenceThreshold = this.configService.get<number>(
-      "POLICY_AUTO_CONFIDENCE_THRESHOLD",
+      'POLICY_AUTO_CONFIDENCE_THRESHOLD',
       85,
     );
     const marginThreshold = this.configService.get<number>(
-      "POLICY_AUTO_DECISION_MARGIN_THRESHOLD",
+      'POLICY_AUTO_DECISION_MARGIN_THRESHOLD',
       20,
     );
     const criticalFactThreshold = this.configService.get<number>(
-      "POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD",
+      'POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD',
       0.8,
     );
 
@@ -853,13 +890,13 @@ export class PolicyEvaluationService {
     if (
       requirements.filter((requirement) => requirement.isMandatory).length === 0
     ) {
-      reasons.push("mandatory requirements were not configured");
+      reasons.push('mandatory requirements were not configured');
     }
 
     if (
-      contradictions.some((contradiction) => contradiction.severity === "HIGH")
+      contradictions.some((contradiction) => contradiction.severity === 'HIGH')
     ) {
-      reasons.push("unresolved high-severity contradiction is present");
+      reasons.push('unresolved high-severity contradiction is present');
     }
 
     const criticalFactTypes = Array.from(
@@ -881,16 +918,16 @@ export class PolicyEvaluationService {
 
     if (unverifiedCriticalFacts.length > 0) {
       reasons.push(
-        `critical facts need verification or confidence >= ${criticalFactThreshold}: ${unverifiedCriticalFacts.join(", ")}`,
+        `critical facts need verification or confidence >= ${criticalFactThreshold}: ${unverifiedCriticalFacts.join(', ')}`,
       );
     }
 
-    if (hasTruthyFact(facts, "POLICY_EXCEPTION")) {
-      reasons.push("policy exception fact is present");
+    if (hasTruthyFact(facts, 'POLICY_EXCEPTION')) {
+      reasons.push('policy exception fact is present');
     }
 
-    if (appliedRuleResults.some((rule) => rule.effect === "REQUIRES_REVIEW")) {
-      reasons.push("an applied prototype rule requires human review");
+    if (appliedRuleResults.some((rule) => rule.effect === 'REQUIRES_REVIEW')) {
+      reasons.push('an applied prototype rule requires human review');
     }
 
     return { passed: reasons.length === 0, reasons };
@@ -922,7 +959,7 @@ export class PolicyEvaluationService {
 function buildRule(
   ruleId: string,
   applied: boolean,
-  effect: RuleResult["effect"],
+  effect: RuleResult['effect'],
   scoreImpact: number,
   evidenceIds: string[],
   criticalFactTypes: string[],
@@ -934,7 +971,7 @@ function buildRule(
     scoreImpact,
     evidenceIds: Array.from(new Set(evidenceIds)),
     criticalFactTypes,
-    explanation: `${ruleId} ${applied ? "applied" : "did not apply"}`,
+    explanation: `${ruleId} ${applied ? 'applied' : 'did not apply'}`,
   };
 }
 
@@ -945,7 +982,7 @@ function requirementForEvidence(
   return requirements.find((requirement) => {
     const acceptedTypes = Array.isArray(requirement.acceptedEvidenceTypes)
       ? requirement.acceptedEvidenceTypes.filter(
-          (value): value is string => typeof value === "string",
+          (value): value is string => typeof value === 'string',
         )
       : [];
     return acceptedTypes.includes(evidence.evidenceType);
@@ -964,12 +1001,12 @@ function supportDirectionFor(
     evidence.extractedFacts.some(
       (fact) =>
         [
-          "DELIVERY_CONFIRMED",
-          "RECIPIENT_CONFIRMED",
-          "DELIVERY_LOCATION_MATCH",
-          "REFUND_COMPLETED",
-          "POLICY_ACCEPTED",
-          "SERVICE_DELIVERED",
+          'DELIVERY_CONFIRMED',
+          'RECIPIENT_CONFIRMED',
+          'DELIVERY_LOCATION_MATCH',
+          'REFUND_COMPLETED',
+          'POLICY_ACCEPTED',
+          'SERVICE_DELIVERED',
         ].includes(fact.factType) && isTruthyValue(normalizedFactValue(fact)),
     )
   ) {
@@ -979,20 +1016,20 @@ function supportDirectionFor(
   if (
     evidence.extractedFacts.some((fact) =>
       [
-        "NON_DELIVERY_STATEMENT",
-        "DELIVERY_NOT_RECEIVED",
-        "REFUND_PROMISED",
-        "CANCELLATION_TIMELY",
-        "CANCELLATION_VALID",
-        "NO_SERVICE_DELIVERY",
-        "NO_REFUND",
+        'NON_DELIVERY_STATEMENT',
+        'DELIVERY_NOT_RECEIVED',
+        'REFUND_PROMISED',
+        'CANCELLATION_TIMELY',
+        'CANCELLATION_VALID',
+        'NO_SERVICE_DELIVERY',
+        'NO_REFUND',
       ].includes(fact.factType),
     )
   ) {
     return EvidenceSupportDirection.SUPPORTS_CARD_MEMBER;
   }
 
-  if (evidence.extractedFacts.some((fact) => fact.factType === "DISPATCHED")) {
+  if (evidence.extractedFacts.some((fact) => fact.factType === 'DISPATCHED')) {
     return EvidenceSupportDirection.NEUTRAL;
   }
 
@@ -1010,22 +1047,22 @@ function supportDirectionFor(
 function sourceReliabilityFor(evidenceType: string): number {
   if (
     [
-      "delivery_confirmation",
-      "tracking_record",
-      "carrier_proof",
-      "completed_refund_transaction",
-      "settlement_record",
-      "processor_record",
-      "terms_acceptance",
-      "policy_snapshot",
-      "service_delivery_record",
-      "attendance_record",
-      "booking_record",
-      "refund_confirmation",
-      "refund_reference",
-      "invoice",
-      "receipt",
-      "order_record",
+      'delivery_confirmation',
+      'tracking_record',
+      'carrier_proof',
+      'completed_refund_transaction',
+      'settlement_record',
+      'processor_record',
+      'terms_acceptance',
+      'policy_snapshot',
+      'service_delivery_record',
+      'attendance_record',
+      'booking_record',
+      'refund_confirmation',
+      'refund_reference',
+      'invoice',
+      'receipt',
+      'order_record',
     ].includes(evidenceType)
   ) {
     return 90;
@@ -1033,10 +1070,10 @@ function sourceReliabilityFor(evidenceType: string): number {
 
   if (
     [
-      "email",
-      "support_ticket",
-      "refund_promise",
-      "cancellation_proof",
+      'email',
+      'support_ticket',
+      'refund_promise',
+      'cancellation_proof',
     ].includes(evidenceType)
   ) {
     return 78;
@@ -1048,14 +1085,14 @@ function sourceReliabilityFor(evidenceType: string): number {
 function directnessFor(evidenceType: string): number {
   if (
     [
-      "delivery_confirmation",
-      "completed_refund_transaction",
-      "settlement_record",
-      "cancellation_confirmation",
-      "service_delivery_record",
-      "non_delivery_statement",
-      "refund_promise",
-      "cancellation_proof",
+      'delivery_confirmation',
+      'completed_refund_transaction',
+      'settlement_record',
+      'cancellation_confirmation',
+      'service_delivery_record',
+      'non_delivery_statement',
+      'refund_promise',
+      'cancellation_proof',
     ].includes(evidenceType)
   ) {
     return 95;
@@ -1063,12 +1100,12 @@ function directnessFor(evidenceType: string): number {
 
   if (
     [
-      "dispatch_record",
-      "shipping_manifest",
-      "fulfillment_record",
-      "invoice",
-      "receipt",
-      "order_record",
+      'dispatch_record',
+      'shipping_manifest',
+      'fulfillment_record',
+      'invoice',
+      'receipt',
+      'order_record',
     ].includes(evidenceType)
   ) {
     return 55;
@@ -1167,14 +1204,14 @@ function normalizeConfidence(confidence: number | null): number | null {
 
 function isTruthyValue(value: string): boolean {
   return [
-    "true",
-    "yes",
-    "y",
-    "1",
-    "confirmed",
-    "completed",
-    "valid",
-    "timely",
+    'true',
+    'yes',
+    'y',
+    '1',
+    'confirmed',
+    'completed',
+    'valid',
+    'timely',
   ].includes(value.trim().toLowerCase());
 }
 

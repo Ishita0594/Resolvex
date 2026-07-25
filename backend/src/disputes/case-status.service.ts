@@ -1,5 +1,8 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { CaseStatus as PrismaCaseStatus, MerchantResponseStatus as PrismaMerchantResponseStatus } from '@prisma/client';
+import {
+  CaseStatus as PrismaCaseStatus,
+  MerchantResponseStatus as PrismaMerchantResponseStatus,
+} from '@prisma/client';
 import { UserRole } from '../users/user-role.enum';
 
 type MerchantResponseCaseState = {
@@ -10,32 +13,53 @@ type MerchantResponseCaseState = {
 
 @Injectable()
 export class CaseStatusService {
-  assertTransitionAllowed(from: PrismaCaseStatus, to: PrismaCaseStatus, role: UserRole): void {
+  assertTransitionAllowed(
+    from: PrismaCaseStatus,
+    to: PrismaCaseStatus,
+    role: UserRole,
+  ): void {
     const allowed = this.allowedTransitionsFor(role).some(
       (transition) => transition.from === from && transition.to === to,
     );
 
     if (!allowed) {
-      throw new ConflictException(`Invalid status transition from ${from} to ${to}`);
+      throw new ConflictException(
+        `Invalid status transition from ${from} to ${to}`,
+      );
     }
   }
 
-  assertMerchantResponseAllowed(disputeCase: MerchantResponseCaseState, now = new Date()): void {
-    if (disputeCase.merchantResponseStatus === PrismaMerchantResponseStatus.SUBMITTED) {
-      throw new ConflictException('A final merchant response has already been submitted');
+  assertMerchantResponseAllowed(
+    disputeCase: MerchantResponseCaseState,
+    now = new Date(),
+  ): void {
+    if (
+      disputeCase.merchantResponseStatus ===
+      PrismaMerchantResponseStatus.SUBMITTED
+    ) {
+      throw new ConflictException(
+        'A final merchant response has already been submitted',
+      );
     }
 
-    this.assertTransitionAllowed(disputeCase.status, PrismaCaseStatus.EVIDENCE_PROCESSING, UserRole.MERCHANT);
+    this.assertTransitionAllowed(
+      disputeCase.status,
+      PrismaCaseStatus.EVIDENCE_PROCESSING,
+      UserRole.MERCHANT,
+    );
 
     if (
       disputeCase.responseDeadline.getTime() < now.getTime() &&
-      disputeCase.merchantResponseStatus !== PrismaMerchantResponseStatus.REOPENED
+      disputeCase.merchantResponseStatus !==
+        PrismaMerchantResponseStatus.REOPENED
     ) {
       throw new ConflictException('Merchant response deadline has passed');
     }
   }
 
-  private allowedTransitionsFor(role: UserRole): Array<{ from: PrismaCaseStatus; to: PrismaCaseStatus }> {
+  private allowedTransitionsFor(
+    role: UserRole,
+  ): Array<{ from: PrismaCaseStatus; to: PrismaCaseStatus }> {
     if (role === UserRole.MERCHANT) {
       return [
         {
@@ -66,6 +90,14 @@ export class CaseStatusService {
         {
           from: PrismaCaseStatus.UNDER_EVALUATION,
           to: PrismaCaseStatus.HUMAN_REVIEW,
+        },
+        {
+          from: PrismaCaseStatus.HUMAN_REVIEW,
+          to: PrismaCaseStatus.AWAITING_MERCHANT,
+        },
+        {
+          from: PrismaCaseStatus.UNDER_EVALUATION,
+          to: PrismaCaseStatus.AWAITING_MERCHANT,
         },
         { from: PrismaCaseStatus.HUMAN_REVIEW, to: PrismaCaseStatus.RESOLVED },
         { from: PrismaCaseStatus.APPEALED, to: PrismaCaseStatus.HUMAN_REVIEW },

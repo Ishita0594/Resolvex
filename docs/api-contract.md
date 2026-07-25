@@ -1,6 +1,6 @@
 # API Contract
 
-This file documents the API surface for ResolveX. Phase 6 implements authentication, card-member transaction reads, dispute creation, dispute reads, dispute timelines, merchant dispute reads, database-backed prototype policy requirements, structured merchant responses, secure evidence upload metadata, AI fact extraction, and deterministic prototype policy evaluation.
+This file documents the API surface for ResolveX. Phase 7 implements authentication, card-member transaction reads, dispute creation, dispute reads, dispute timelines, merchant dispute reads, database-backed prototype policy requirements, structured merchant responses, secure evidence upload metadata, AI fact extraction, deterministic prototype policy evaluation, analyst review, audit logs, notifications, and authenticated case events.
 
 ## Conventions
 - Base path: `/api`
@@ -28,9 +28,10 @@ This file documents the API surface for ResolveX. Phase 6 implements authenticat
 - `Merchant Responses`: structured merchant response submission
 - `Evidence`: upload target creation, local multipart upload support, confirmation, metadata reads, temporary downloads, AI processing, extracted fact reads and updates, retry, and deletion
 - `Policy Evaluation`: deterministic rule evaluation, evidence scoring, evidence matrix reads, and structured explanations
+- `Analyst Review`: analyst queue, final decisions, overrides with justification, information requests, audit logs, notifications, and safe websocket events
 
 ## Planned Resources
-- `Analyst Review`: human review queue, decisions, appeals
+- Appeals and analyst assignment
 
 ## Prototype Policy Notice
 Phase 6 policy requirements and policy rules are ResolveX prototype assumptions for demo and product validation. They are not official legal policy, card-network rules, or issuer/acquirer operating regulations.
@@ -576,6 +577,85 @@ Prototype rule identifiers:
 - `PX-CAN-001`: timely valid cancellation plus no service delivery and no refund supports card member.
 - `PX-CAN-002`: late cancellation after clearly accepted policy may support merchant.
 - `PX-CAN-003`: unclear timing or policy acceptance requires review.
+
+### `GET /api/disputes/:caseId/audit-log`
+Returns audit log entries for a visible case. Card members and merchants can read audit entries for their own cases; analysts can read case audit logs for review.
+
+Audit entries include action, entity type, entity ID, previous/new JSON values, nullable user ID, nullable case ID, nullable IP address, and creation time.
+
+## Implemented Analyst Endpoints
+All analyst endpoints require JWT authentication and the `ANALYST` role.
+
+Analyst decisions:
+- `SUPPORT_CARD_MEMBER`
+- `SUPPORT_MERCHANT`
+- `REQUEST_MORE_INFORMATION`
+- `ESCALATE`
+
+Rules:
+- Analyst decisions are stored as `AnalystReview` rows.
+- Earlier `DecisionRecord` rows are preserved. Final human support decisions append a new `DecisionRecord` with `decisionType=HUMAN_DECISION`.
+- `overrideReason` is required when the analyst decision differs from the latest system recommendation.
+- Analyst endpoints do not modify evidence content.
+- Final decisions and information requests create timeline events and audit log rows.
+- Card member and merchant receive notifications.
+- Status changes are validated through the status service.
+
+### `GET /api/analyst/cases`
+Lists cases requiring review. A case appears when its status is `HUMAN_REVIEW` or any stored decision record has `recommendedOutcome=HUMAN_REVIEW_REQUIRED`.
+
+### `GET /api/analyst/cases/:caseId`
+Returns one analyst case with latest recommendation, explanation data, and prior analyst reviews.
+
+### `POST /api/analyst/cases/:caseId/decision`
+Records an analyst decision.
+
+Request:
+```json
+{
+  "decision": "SUPPORT_MERCHANT",
+  "overrideReason": "Required only when differing from the system recommendation.",
+  "analystNotes": "Optional notes for audit and review."
+}
+```
+
+### `POST /api/analyst/cases/:caseId/request-information`
+Requests additional information and moves the case through the status service to `AWAITING_MERCHANT` when applicable.
+
+Request:
+```json
+{
+  "message": "Please provide the processor trace for the refund.",
+  "requestedEvidenceTypes": ["processor_trace"]
+}
+```
+
+## Implemented Notification Endpoints
+Notification endpoints require JWT authentication and operate only on the authenticated user's notifications.
+
+### `GET /api/notifications`
+Lists notifications for the authenticated user.
+
+### `PATCH /api/notifications/:notificationId/read`
+Marks one notification read when it belongs to the authenticated user.
+
+### `PATCH /api/notifications/read-all`
+Marks all unread notifications read for the authenticated user.
+
+## Authenticated Case Events
+Socket.IO namespace: `/case-events`.
+
+Clients authenticate with either `handshake.auth.token` or an `Authorization: Bearer <token>` header. Connections without a valid JWT are disconnected.
+
+Supported server events:
+- `case.status.updated`
+- `evidence.processing.completed`
+- `merchant.response.received`
+- `analyst.review.required`
+- `decision.generated`
+- `information.requested`
+
+Clients may emit `case.subscribe` with `{ "caseId": "uuid" }`; subscription succeeds only when the user can access that case. Server broadcasts are sent only to the card member, merchant, and analysts. Event payloads contain safe display metadata only: case ID, new status, title/message, and small counts or labels. Complete evidence content is never broadcast.
 
 ## AI Service Endpoints
 The AI service is a separate FastAPI process. It extracts and classifies reviewable evidence facts only.

@@ -4,10 +4,14 @@ import {
   MerchantResponseStatus as PrismaMerchantResponseStatus,
   Prisma,
 } from '@prisma/client';
+import { CaseEventsGateway } from '../events/case-events.gateway';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '../users/user-role.enum';
 import { CaseStatusService } from './case-status.service';
-import { DisputeCaseResponse, serializeDisputeCase } from './disputes.serializer';
+import {
+  DisputeCaseResponse,
+  serializeDisputeCase,
+} from './disputes.serializer';
 import { MerchantResponseDto } from './dto/merchant-response.dto';
 import { PolicyRequirementsService } from './policy-requirements.service';
 
@@ -17,6 +21,7 @@ export class MerchantCasesService {
     private readonly prisma: PrismaService,
     private readonly caseStatusService: CaseStatusService,
     private readonly policyRequirementsService: PolicyRequirementsService,
+    private readonly caseEventsGateway: CaseEventsGateway,
   ) {}
 
   async findForMerchant(merchantId: string): Promise<DisputeCaseResponse[]> {
@@ -29,7 +34,10 @@ export class MerchantCasesService {
     return disputeCases.map(serializeDisputeCase);
   }
 
-  async findOneForMerchant(caseId: string, merchantId: string): Promise<DisputeCaseResponse> {
+  async findOneForMerchant(
+    caseId: string,
+    merchantId: string,
+  ): Promise<DisputeCaseResponse> {
     const disputeCase = await this.prisma.disputeCase.findFirst({
       where: {
         id: caseId,
@@ -64,17 +72,24 @@ export class MerchantCasesService {
 
     this.caseStatusService.assertMerchantResponseAllowed(disputeCase);
 
-    const requirements = await this.policyRequirementsService.findActiveForReason(disputeCase.reasonCode);
-    this.policyRequirementsService.validateEvidenceForRequirements(merchantResponseDto.evidence, requirements);
+    const requirements =
+      await this.policyRequirementsService.findActiveForReason(
+        disputeCase.reasonCode,
+      );
+    this.policyRequirementsService.validateEvidenceForRequirements(
+      merchantResponseDto.evidence,
+      requirements,
+    );
 
     const responseDate = new Date();
-    const submittedEvidenceMetadata: Prisma.InputJsonArray = merchantResponseDto.evidence.map((evidence) => ({
-      requirementKey: evidence.requirementKey,
-      evidenceType: evidence.evidenceType,
-      value: evidence.value ?? null,
-      documentId: evidence.documentId ?? null,
-      metadata: (evidence.metadata ?? null) as Prisma.InputJsonObject | null,
-    }));
+    const submittedEvidenceMetadata: Prisma.InputJsonArray =
+      merchantResponseDto.evidence.map((evidence) => ({
+        requirementKey: evidence.requirementKey,
+        evidenceType: evidence.evidenceType,
+        value: evidence.value ?? null,
+        documentId: evidence.documentId ?? null,
+        metadata: (evidence.metadata ?? null) as Prisma.InputJsonObject | null,
+      }));
     const merchantResponseMetadata: Prisma.InputJsonObject = {
       merchantResponseStatus: PrismaMerchantResponseStatus.SUBMITTED,
       responseDate: responseDate.toISOString(),
@@ -100,7 +115,10 @@ export class MerchantCasesService {
         throw new NotFoundException('Dispute case not found');
       }
 
-      this.caseStatusService.assertMerchantResponseAllowed(currentCase, responseDate);
+      this.caseStatusService.assertMerchantResponseAllowed(
+        currentCase,
+        responseDate,
+      );
       this.caseStatusService.assertTransitionAllowed(
         currentCase.status,
         PrismaCaseStatus.EVIDENCE_PROCESSING,
@@ -122,7 +140,8 @@ export class MerchantCasesService {
         data: {
           caseId: currentCase.id,
           eventType: 'MERCHANT_RESPONSE_SUBMITTED',
-          description: 'Merchant submitted a structured response with policy requirement evidence.',
+          description:
+            'Merchant submitted a structured response with policy requirement evidence.',
           performedBy: merchantId,
           metadata: merchantResponseMetadata,
         },
@@ -132,7 +151,8 @@ export class MerchantCasesService {
         data: {
           caseId: currentCase.id,
           eventType: 'CASE_STATUS_CHANGED',
-          description: 'Case moved to evidence processing after merchant response.',
+          description:
+            'Case moved to evidence processing after merchant response.',
           performedBy: merchantId,
           metadata: {
             fromStatus: currentCase.status,
@@ -142,6 +162,25 @@ export class MerchantCasesService {
       });
 
       return updated;
+    });
+
+    await this.caseEventsGateway.emitCaseEvent(
+      caseId,
+      'merchant.response.received',
+      {
+        caseId,
+        newStatus: updatedCase.status,
+        title: 'Merchant response received',
+        metadata: {
+          evidenceItemCount: merchantResponseDto.evidence.length,
+        },
+      },
+    );
+
+    await this.caseEventsGateway.emitCaseEvent(caseId, 'case.status.updated', {
+      caseId,
+      newStatus: updatedCase.status,
+      title: 'Case status updated',
     });
 
     return serializeDisputeCase(updatedCase);
