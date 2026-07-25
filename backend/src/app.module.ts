@@ -8,6 +8,7 @@ import { EventsModule } from './events/events.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { HealthModule } from './health/health.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { UsersModule } from './users/users.module';
 
@@ -26,6 +27,7 @@ import { UsersModule } from './users/users.module';
     EventsModule,
     NotificationsModule,
     AnalystModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

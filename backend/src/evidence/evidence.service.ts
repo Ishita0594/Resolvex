@@ -7,7 +7,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { CaseStatus as PrismaCaseStatus, EvidenceItem, EvidenceProcessingStatus, Prisma } from '@prisma/client';
+import {
+  CaseStatus as PrismaCaseStatus,
+  EvidenceItem,
+  EvidenceProcessingStatus,
+  Prisma,
+} from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { basename } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,7 +21,10 @@ import { UserRole } from '../users/user-role.enum';
 import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 import { CreateUploadTargetDto } from './dto/create-upload-target.dto';
 import { UpdateFactsDto } from './dto/update-facts.dto';
-import { EvidenceItemResponse, serializeEvidenceItem } from './evidence.serializer';
+import {
+  EvidenceItemResponse,
+  serializeEvidenceItem,
+} from './evidence.serializer';
 import { validateEvidenceFile } from './evidence-file.validation';
 import { LocalStorageProvider } from './storage/local-storage.provider';
 import { STORAGE_PROVIDER } from './storage/storage.constants';
@@ -65,9 +73,17 @@ export class EvidenceService {
   ): Promise<Omit<UploadTarget, 'storageKey'> & { evidenceId: string }> {
     this.assertUploaderRole(user);
     const disputeCase = await this.findCaseForUpload(caseId, user);
-    const sanitizedFileName = this.validateFile(dto.fileName, dto.mimeType, dto.sizeBytes);
+    const sanitizedFileName = this.validateFile(
+      dto.fileName,
+      dto.mimeType,
+      dto.sizeBytes,
+    );
     const evidenceId = randomUUID();
-    const storageKey = this.buildStorageKey(disputeCase.id, evidenceId, sanitizedFileName);
+    const storageKey = this.buildStorageKey(
+      disputeCase.id,
+      evidenceId,
+      sanitizedFileName,
+    );
     const uploadTarget = await this.storageProvider.createUploadTarget({
       evidenceId,
       caseId: disputeCase.id,
@@ -106,7 +122,10 @@ export class EvidenceService {
             mimeType: dto.mimeType,
             sizeBytes: dto.sizeBytes,
             submittedByRole: user.role,
-            storageProvider: this.configService.get<string>('STORAGE_PROVIDER', 'local'),
+            storageProvider: this.configService.get<string>(
+              'STORAGE_PROVIDER',
+              'local',
+            ),
           },
         },
       });
@@ -122,24 +141,42 @@ export class EvidenceService {
     };
   }
 
-  async confirmUpload(caseId: string, user: PublicUser, dto: ConfirmUploadDto): Promise<EvidenceItemResponse> {
+  async confirmUpload(
+    caseId: string,
+    user: PublicUser,
+    dto: ConfirmUploadDto,
+  ): Promise<EvidenceItemResponse> {
     const evidence = await this.findEvidenceForCase(dto.evidenceId, caseId);
     this.assertCanModifyEvidence(evidence, user);
 
     if (dto.fileHash && !/^[a-fA-F0-9]{64}$/.test(dto.fileHash)) {
-      throw new BadRequestException('fileHash must be a SHA-256 hexadecimal digest');
+      throw new BadRequestException(
+        'fileHash must be a SHA-256 hexadecimal digest',
+      );
     }
 
     const confirmResult = await this.storageProvider.confirmUpload({
       storageKey: evidence.storageKey,
       expectedHash: dto.fileHash?.toLowerCase(),
     });
+    const normalizedFileHash = confirmResult.fileHash?.toLowerCase() ?? null;
+
+    if (evidence.fileHash === normalizedFileHash) {
+      const existingEvidence = await this.prisma.evidenceItem.findUniqueOrThrow(
+        {
+          where: { id: evidence.id },
+          include: { extractedFacts: true },
+        },
+      );
+
+      return serializeEvidenceItem(existingEvidence);
+    }
 
     const updatedEvidence = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.evidenceItem.update({
         where: { id: evidence.id },
         data: {
-          fileHash: confirmResult.fileHash?.toLowerCase() ?? null,
+          fileHash: normalizedFileHash,
           processingStatus: EvidenceProcessingStatus.UPLOADED,
         },
         include: { extractedFacts: true },
@@ -158,7 +195,7 @@ export class EvidenceService {
             mimeType: evidence.mimeType,
             sizeBytes: evidence.sizeBytes,
             submittedByRole: evidence.submittedByRole,
-            fileHash: confirmResult.fileHash?.toLowerCase() ?? null,
+            fileHash: normalizedFileHash,
           },
         },
       });
@@ -169,7 +206,10 @@ export class EvidenceService {
     return serializeEvidenceItem(updatedEvidence);
   }
 
-  async listForCase(caseId: string, user: PublicUser): Promise<EvidenceItemResponse[]> {
+  async listForCase(
+    caseId: string,
+    user: PublicUser,
+  ): Promise<EvidenceItemResponse[]> {
     await this.findCaseForRead(caseId, user);
 
     const evidenceItems = await this.prisma.evidenceItem.findMany({
@@ -181,12 +221,18 @@ export class EvidenceService {
     return evidenceItems.map(serializeEvidenceItem);
   }
 
-  async findOne(evidenceId: string, user: PublicUser): Promise<EvidenceItemResponse> {
+  async findOne(
+    evidenceId: string,
+    user: PublicUser,
+  ): Promise<EvidenceItemResponse> {
     const evidence = await this.findEvidenceForRead(evidenceId, user);
     return serializeEvidenceItem(evidence);
   }
 
-  async createTemporaryDownload(evidenceId: string, user: PublicUser): Promise<TemporaryDownloadTarget> {
+  async createTemporaryDownload(
+    evidenceId: string,
+    user: PublicUser,
+  ): Promise<TemporaryDownloadTarget> {
     const evidence = await this.findEvidenceForRead(evidenceId, user);
 
     if (!(await this.storageProvider.objectExists(evidence.storageKey))) {
@@ -201,7 +247,11 @@ export class EvidenceService {
     });
   }
 
-  async replaceFacts(evidenceId: string, user: PublicUser, dto: UpdateFactsDto): Promise<EvidenceItemResponse> {
+  async replaceFacts(
+    evidenceId: string,
+    user: PublicUser,
+    dto: UpdateFactsDto,
+  ): Promise<EvidenceItemResponse> {
     const evidence = await this.findEvidenceWithCase(evidenceId);
     this.assertCanModifyEvidence(evidence, user, { allowAnalyst: true });
 
@@ -240,7 +290,9 @@ export class EvidenceService {
     this.assertCanModifyEvidence(evidence, user);
 
     if (!DELETE_ALLOWED_STATUSES.has(evidence.case.status)) {
-      throw new ConflictException('Evidence cannot be deleted after case evaluation has started');
+      throw new ConflictException(
+        'Evidence cannot be deleted after case evaluation has started',
+      );
     }
 
     await this.storageProvider.deleteObject(evidence.storageKey);
@@ -281,16 +333,25 @@ export class EvidenceService {
     const evidence = await this.findEvidenceWithCase(evidenceId);
     this.assertCanModifyEvidence(evidence, user);
 
-    const sanitizedFileName = this.validateFile(file.originalname, file.mimetype, file.size);
+    const sanitizedFileName = this.validateFile(
+      file.originalname,
+      file.mimetype,
+      file.size,
+    );
     if (
       sanitizedFileName !== evidence.fileName ||
       file.mimetype !== evidence.mimeType ||
       file.size !== evidence.sizeBytes
     ) {
-      throw new BadRequestException('Uploaded file does not match the requested upload target metadata');
+      throw new BadRequestException(
+        'Uploaded file does not match the requested upload target metadata',
+      );
     }
 
-    const fileHash = await this.localStorageProvider.saveMultipartUpload(evidence.storageKey, file.buffer);
+    const fileHash = await this.localStorageProvider.saveMultipartUpload(
+      evidence.storageKey,
+      file.buffer,
+    );
     return { fileHash };
   }
 
@@ -298,16 +359,31 @@ export class EvidenceService {
     evidenceId: string,
     expires: string,
     signature: string,
-  ): Promise<{ stream: NodeJS.ReadableStream; fileName: string; mimeType: string }> {
-    if (!this.localStorageProvider.verifyDownloadSignature(evidenceId, expires, signature)) {
-      throw new ForbiddenException('Temporary download link is invalid or expired');
+  ): Promise<{
+    stream: NodeJS.ReadableStream;
+    fileName: string;
+    mimeType: string;
+  }> {
+    if (
+      !this.localStorageProvider.verifyDownloadSignature(
+        evidenceId,
+        expires,
+        signature,
+      )
+    ) {
+      throw new ForbiddenException(
+        'Temporary download link is invalid or expired',
+      );
     }
 
     const evidence = await this.prisma.evidenceItem.findUnique({
       where: { id: evidenceId },
     });
 
-    if (!evidence || !(await this.localStorageProvider.objectExists(evidence.storageKey))) {
+    if (
+      !evidence ||
+      !(await this.localStorageProvider.objectExists(evidence.storageKey))
+    ) {
       throw new NotFoundException('Evidence file was not found');
     }
 
@@ -328,7 +404,9 @@ export class EvidenceService {
     } else if (user.role === UserRole.MERCHANT) {
       where.merchantId = user.id;
     } else {
-      throw new ForbiddenException('Only card members and merchants can upload evidence');
+      throw new ForbiddenException(
+        'Only card members and merchants can upload evidence',
+      );
     }
 
     const disputeCase = await this.prisma.disputeCase.findFirst({
@@ -378,7 +456,10 @@ export class EvidenceService {
     return disputeCase;
   }
 
-  private async findEvidenceForCase(evidenceId: string, caseId: string): Promise<EvidenceWithCase> {
+  private async findEvidenceForCase(
+    evidenceId: string,
+    caseId: string,
+  ): Promise<EvidenceWithCase> {
     const evidence = await this.prisma.evidenceItem.findFirst({
       where: { id: evidenceId, caseId },
       include: { case: true },
@@ -408,7 +489,9 @@ export class EvidenceService {
     return evidence;
   }
 
-  private async findEvidenceWithCase(evidenceId: string): Promise<EvidenceWithCase> {
+  private async findEvidenceWithCase(
+    evidenceId: string,
+  ): Promise<EvidenceWithCase> {
     const evidence = await this.prisma.evidenceItem.findUnique({
       where: { id: evidenceId },
       include: { case: true },
@@ -423,20 +506,31 @@ export class EvidenceService {
 
   private assertUploaderRole(user: PublicUser): void {
     if (user.role !== UserRole.CARD_MEMBER && user.role !== UserRole.MERCHANT) {
-      throw new ForbiddenException('Only card members and merchants can upload evidence');
+      throw new ForbiddenException(
+        'Only card members and merchants can upload evidence',
+      );
     }
   }
 
-  private assertCanReadEvidence(evidence: EvidenceWithCase, user: PublicUser): void {
+  private assertCanReadEvidence(
+    evidence: EvidenceWithCase,
+    user: PublicUser,
+  ): void {
     if (user.role === UserRole.ANALYST) {
       return;
     }
 
-    if (user.role === UserRole.CARD_MEMBER && evidence.case.cardMemberId === user.id) {
+    if (
+      user.role === UserRole.CARD_MEMBER &&
+      evidence.case.cardMemberId === user.id
+    ) {
       return;
     }
 
-    if (user.role === UserRole.MERCHANT && evidence.case.merchantId === user.id) {
+    if (
+      user.role === UserRole.MERCHANT &&
+      evidence.case.merchantId === user.id
+    ) {
       return;
     }
 
@@ -454,23 +548,41 @@ export class EvidenceService {
       return;
     }
 
-    if (evidence.submittedByUserId === user.id && String(evidence.submittedByRole) === String(user.role)) {
+    if (
+      evidence.submittedByUserId === user.id &&
+      String(evidence.submittedByRole) === String(user.role)
+    ) {
       return;
     }
 
-    throw new ForbiddenException('Users cannot modify evidence submitted by the other party');
+    throw new ForbiddenException(
+      'Users cannot modify evidence submitted by the other party',
+    );
   }
 
-  private validateFile(fileName: string, mimeType: string, sizeBytes: number): string {
+  private validateFile(
+    fileName: string,
+    mimeType: string,
+    sizeBytes: number,
+  ): string {
     return validateEvidenceFile({
       fileName,
       mimeType,
       sizeBytes,
-      maxSizeBytes: this.configService.get<number>('MAX_EVIDENCE_FILE_SIZE_BYTES', 10 * 1024 * 1024),
+      maxSizeBytes: this.configService.get<number>(
+        'MAX_EVIDENCE_FILE_SIZE_BYTES',
+        10 * 1024 * 1024,
+      ),
     });
   }
 
-  private buildStorageKey(caseId: string, evidenceId: string, sanitizedFileName: string): string {
-    return ['evidence', caseId, evidenceId, basename(sanitizedFileName)].join('/');
+  private buildStorageKey(
+    caseId: string,
+    evidenceId: string,
+    sanitizedFileName: string,
+  ): string {
+    return ['evidence', caseId, evidenceId, basename(sanitizedFileName)].join(
+      '/',
+    );
   }
 }

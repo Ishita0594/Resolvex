@@ -66,6 +66,7 @@ export class CaseStatusService {
           from: PrismaCaseStatus.AWAITING_MERCHANT,
           to: PrismaCaseStatus.EVIDENCE_PROCESSING,
         },
+        { from: PrismaCaseStatus.RESOLVED, to: PrismaCaseStatus.APPEALED },
       ];
     }
 

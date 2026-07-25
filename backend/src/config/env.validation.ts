@@ -13,6 +13,7 @@ export interface ValidatedEnvironment {
   EVIDENCE_UPLOAD_URL_TTL_SECONDS: number;
   EVIDENCE_DOWNLOAD_URL_TTL_SECONDS: number;
   API_PUBLIC_BASE_URL?: string;
+  FRONTEND_URL?: string;
   AWS_REGION?: string;
   AWS_S3_BUCKET?: string;
   AWS_ACCESS_KEY_ID?: string;
@@ -20,6 +21,12 @@ export interface ValidatedEnvironment {
   AWS_SESSION_TOKEN?: string;
   AI_SERVICE_URL: string;
   AI_SERVICE_TIMEOUT_MS: number;
+  AI_SERVICE_RETRY_ATTEMPTS: number;
+  AI_SERVICE_RETRY_BACKOFF_MS: number;
+  CORS_ALLOWED_ORIGINS: string[];
+  RATE_LIMIT_WINDOW_MS: number;
+  AUTH_RATE_LIMIT_MAX: number;
+  UPLOAD_RATE_LIMIT_MAX: number;
   POLICY_AUTO_CONFIDENCE_THRESHOLD: number;
   POLICY_AUTO_DECISION_MARGIN_THRESHOLD: number;
   POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD: number;
@@ -39,6 +46,10 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     throw new Error(
       'JWT_SECRET must be changed from the documented placeholder value',
     );
+  }
+
+  if ((config.JWT_SECRET?.length ?? 0) < 32) {
+    throw new Error('JWT_SECRET must be at least 32 characters');
   }
 
   const port = Number(config.PORT ?? 3000);
@@ -102,6 +113,46 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     throw new Error('AI_SERVICE_TIMEOUT_MS must be a positive integer');
   }
 
+  const aiServiceRetryAttempts = Number(config.AI_SERVICE_RETRY_ATTEMPTS ?? 2);
+  if (
+    !Number.isInteger(aiServiceRetryAttempts) ||
+    aiServiceRetryAttempts < 0 ||
+    aiServiceRetryAttempts > 5
+  ) {
+    throw new Error('AI_SERVICE_RETRY_ATTEMPTS must be an integer from 0 to 5');
+  }
+
+  const aiServiceRetryBackoffMs = Number(
+    config.AI_SERVICE_RETRY_BACKOFF_MS ?? 150,
+  );
+  if (
+    !Number.isInteger(aiServiceRetryBackoffMs) ||
+    aiServiceRetryBackoffMs < 0 ||
+    aiServiceRetryBackoffMs > 5000
+  ) {
+    throw new Error(
+      'AI_SERVICE_RETRY_BACKOFF_MS must be an integer from 0 to 5000',
+    );
+  }
+
+  const corsAllowedOrigins = parseCsv(
+    config.CORS_ALLOWED_ORIGINS ?? config.FRONTEND_URL,
+  );
+  const rateLimitWindowMs = Number(config.RATE_LIMIT_WINDOW_MS ?? 60_000);
+  if (!Number.isInteger(rateLimitWindowMs) || rateLimitWindowMs <= 0) {
+    throw new Error('RATE_LIMIT_WINDOW_MS must be a positive integer');
+  }
+
+  const authRateLimitMax = Number(config.AUTH_RATE_LIMIT_MAX ?? 100);
+  if (!Number.isInteger(authRateLimitMax) || authRateLimitMax <= 0) {
+    throw new Error('AUTH_RATE_LIMIT_MAX must be a positive integer');
+  }
+
+  const uploadRateLimitMax = Number(config.UPLOAD_RATE_LIMIT_MAX ?? 120);
+  if (!Number.isInteger(uploadRateLimitMax) || uploadRateLimitMax <= 0) {
+    throw new Error('UPLOAD_RATE_LIMIT_MAX must be a positive integer');
+  }
+
   const policyAutoConfidenceThreshold = Number(
     config.POLICY_AUTO_CONFIDENCE_THRESHOLD ?? 85,
   );
@@ -148,7 +199,11 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
       'AWS_ACCESS_KEY_ID',
       'AWS_SECRET_ACCESS_KEY',
     ];
-    const missingS3Keys = requiredS3Keys.filter((key) => !config[key]);
+    const missingS3Keys = requiredS3Keys.filter((key) =>
+      key === 'AWS_S3_BUCKET'
+        ? !config.AWS_S3_BUCKET && !config.S3_BUCKET_NAME
+        : !config[key],
+    );
 
     if (missingS3Keys.length > 0) {
       throw new Error(
@@ -170,16 +225,30 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     EVIDENCE_UPLOAD_URL_TTL_SECONDS: evidenceUploadUrlTtlSeconds,
     EVIDENCE_DOWNLOAD_URL_TTL_SECONDS: evidenceDownloadUrlTtlSeconds,
     API_PUBLIC_BASE_URL: config.API_PUBLIC_BASE_URL,
+    FRONTEND_URL: config.FRONTEND_URL,
     AWS_REGION: config.AWS_REGION,
-    AWS_S3_BUCKET: config.AWS_S3_BUCKET,
+    AWS_S3_BUCKET: config.AWS_S3_BUCKET ?? config.S3_BUCKET_NAME,
     AWS_ACCESS_KEY_ID: config.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: config.AWS_SECRET_ACCESS_KEY,
     AWS_SESSION_TOKEN: config.AWS_SESSION_TOKEN,
     AI_SERVICE_URL: config.AI_SERVICE_URL ?? 'http://localhost:8000',
     AI_SERVICE_TIMEOUT_MS: aiServiceTimeoutMs,
+    AI_SERVICE_RETRY_ATTEMPTS: aiServiceRetryAttempts,
+    AI_SERVICE_RETRY_BACKOFF_MS: aiServiceRetryBackoffMs,
+    CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
+    RATE_LIMIT_WINDOW_MS: rateLimitWindowMs,
+    AUTH_RATE_LIMIT_MAX: authRateLimitMax,
+    UPLOAD_RATE_LIMIT_MAX: uploadRateLimitMax,
     POLICY_AUTO_CONFIDENCE_THRESHOLD: policyAutoConfidenceThreshold,
     POLICY_AUTO_DECISION_MARGIN_THRESHOLD: policyAutoDecisionMarginThreshold,
     POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD:
       policyCriticalFactConfidenceThreshold,
   };
+}
+
+function parseCsv(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 }

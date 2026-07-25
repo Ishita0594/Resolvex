@@ -20,6 +20,17 @@ The seed script creates prototype users for local demos:
 
 Set `RESOLVEX_DEMO_PASSWORD` or role-specific `RESOLVEX_DEMO_*_PASSWORD` values in `.env`. If omitted, the script uses the documented development-only fallback `ResolveXDemo123!`.
 
+Phase 9 also seeds four stable judging scenarios:
+- Scenario A card member supported: `91000000-0000-4000-8000-000000000001`
+- Scenario B merchant supported: `91000000-0000-4000-8000-000000000002`
+- Scenario C human review: `91000000-0000-4000-8000-000000000003`
+- Scenario D refund not processed: `91000000-0000-4000-8000-000000000004`
+
+Reset those scenarios with:
+```powershell
+npm run reset-demo-data
+```
+
 ## Evidence Storage
 Local development uses `STORAGE_PROVIDER=local` and writes evidence files under `LOCAL_STORAGE_PATH` without AWS credentials.
 
@@ -37,6 +48,21 @@ Automatic recommendations use deterministic prototype rules only. The default ga
 
 ## Analyst Review and Events
 Phase 7 adds analyst review decisions, audit logs, user notifications, and the authenticated Socket.IO namespace `/case-events`. Event payloads contain case IDs, status labels, and safe display metadata only.
+
+## Phase 8 Hardening
+Phase 8 adds secure headers, CORS allowlisting, request IDs, bounded rate limits for auth/upload paths, AI retry/backoff, audit masking, and `GET /api/health`.
+
+This backend prototype is for synthetic demo data only and must not process real cardholder data.
+
+## Docker
+Build and run through the repository-level Compose stack:
+```powershell
+docker compose up -d --build
+docker compose ps
+Invoke-RestMethod http://localhost:3000/api/health
+```
+
+The backend container runs `prisma migrate deploy` and `prisma db seed` before `node dist/main.js`.
 
 ## Commands
 ```powershell

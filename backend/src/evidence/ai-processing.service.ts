@@ -209,48 +209,75 @@ export class AiProcessingService {
       'AI_SERVICE_TIMEOUT_MS',
       15000,
     );
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const retryAttempts = this.configService.get<number>(
+      'AI_SERVICE_RETRY_ATTEMPTS',
+      2,
+    );
+    const retryBackoffMs = this.configService.get<number>(
+      'AI_SERVICE_RETRY_BACKOFF_MS',
+      150,
+    );
+    let lastTransientError: Error | undefined;
 
-    try {
-      const formData = new FormData();
-      formData.append(
-        'file',
-        new Blob([new Uint8Array(documentBytes)], { type: evidence.mimeType }),
-        evidence.fileName,
-      );
-      formData.append('file_name', evidence.fileName);
-      formData.append('mime_type', evidence.mimeType);
-      formData.append('evidence_type_hint', evidence.evidenceType);
+    for (let attempt = 0; attempt <= retryAttempts; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-      const response = await fetch(
-        `${aiServiceUrl.replace(/\/$/, '')}/parse-document`,
-        {
-          method: 'POST',
-          body: formData,
-          signal: controller.signal,
-        },
-      );
+      try {
+        const formData = new FormData();
+        formData.append(
+          'file',
+          new Blob([new Uint8Array(documentBytes)], {
+            type: evidence.mimeType,
+          }),
+          evidence.fileName,
+        );
+        formData.append('file_name', evidence.fileName);
+        formData.append('mime_type', evidence.mimeType);
+        formData.append('evidence_type_hint', evidence.evidenceType);
 
-      if (!response.ok) {
-        throw new BadGatewayException(`AI service returned ${response.status}`);
+        const response = await fetch(
+          `${aiServiceUrl.replace(/\/$/, '')}/parse-document`,
+          {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          if (response.status >= 500) {
+            lastTransientError = new Error(
+              `AI service returned ${response.status}`,
+            );
+            await sleepBeforeRetry(attempt, retryAttempts, retryBackoffMs);
+            continue;
+          }
+
+          throw new BadGatewayException(
+            `AI service returned ${response.status}`,
+          );
+        }
+
+        return this.validateAiResponse(await response.json());
+      } catch (error) {
+        if (
+          error instanceof BadGatewayException ||
+          error instanceof BadRequestException
+        ) {
+          throw error;
+        }
+
+        lastTransientError = error as Error;
+        await sleepBeforeRetry(attempt, retryAttempts, retryBackoffMs);
+      } finally {
+        clearTimeout(timeout);
       }
-
-      return this.validateAiResponse(await response.json());
-    } catch (error) {
-      if (
-        error instanceof BadGatewayException ||
-        error instanceof BadRequestException
-      ) {
-        throw error;
-      }
-
-      throw new BadGatewayException(
-        `AI processing request failed: ${(error as Error).message}`,
-      );
-    } finally {
-      clearTimeout(timeout);
     }
+
+    throw new BadGatewayException(
+      `AI processing request failed: ${lastTransientError?.message ?? 'unavailable'}`,
+    );
   }
 
   private validateAiResponse(value: unknown): ValidatedAiResponse {
@@ -503,4 +530,18 @@ function optionalPositiveInteger(value: unknown, field: string): number | null {
   }
 
   return value;
+}
+
+async function sleepBeforeRetry(
+  attempt: number,
+  retryAttempts: number,
+  retryBackoffMs: number,
+): Promise<void> {
+  if (attempt >= retryAttempts || retryBackoffMs === 0) {
+    return;
+  }
+
+  await new Promise((resolve) =>
+    setTimeout(resolve, retryBackoffMs * 2 ** attempt),
+  );
 }

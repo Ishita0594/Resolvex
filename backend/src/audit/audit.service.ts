@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { maskSensitiveValue } from '../common/security/sensitive-data';
 import { PrismaService } from '../prisma/prisma.service';
 import { PublicUser } from '../users/public-user.type';
 import { UserRole } from '../users/user-role.enum';
@@ -38,8 +39,8 @@ export class AuditService {
         action: data.action,
         entityType: data.entityType,
         entityId: data.entityId,
-        previousValue: data.previousValue ?? Prisma.JsonNull,
-        newValue: data.newValue ?? Prisma.JsonNull,
+        previousValue: toMaskedJson(data.previousValue),
+        newValue: toMaskedJson(data.newValue),
         ipAddress: data.ipAddress ?? null,
       },
     });
@@ -84,6 +85,14 @@ export class AuditService {
       throw new NotFoundException('Dispute case not found');
     }
   }
+}
+
+function toMaskedJson(value: Prisma.InputJsonValue | null | undefined) {
+  if (value === null || value === undefined) {
+    return Prisma.JsonNull;
+  }
+
+  return maskSensitiveValue(value) as Prisma.InputJsonValue;
 }
 
 function serializeAuditLog(auditLog: {

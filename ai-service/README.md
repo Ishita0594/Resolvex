@@ -30,3 +30,5 @@ python -m compileall app
 ```powershell
 docker build -t resolvex-ai-service .
 ```
+
+The repository-level Compose stack builds this service, exposes it on `8000`, and checks `GET /health` before starting the backend.

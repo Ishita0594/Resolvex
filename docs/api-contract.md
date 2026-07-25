@@ -8,6 +8,9 @@ This file documents the API surface for ResolveX. Phase 7 implements authenticat
 - Authorization: role-based access control
 - Request and response bodies: JSON
 - Error format: stable machine-readable code plus human-readable message
+- Error responses include an `x-request-id` response header and `requestId` body field when available.
+- Auth and evidence upload/processing endpoints are rate limited.
+- Browser CORS is controlled by `CORS_ALLOWED_ORIGINS`.
 
 ## Roles
 - `CARD_MEMBER`
@@ -29,12 +32,34 @@ This file documents the API surface for ResolveX. Phase 7 implements authenticat
 - `Evidence`: upload target creation, local multipart upload support, confirmation, metadata reads, temporary downloads, AI processing, extracted fact reads and updates, retry, and deletion
 - `Policy Evaluation`: deterministic rule evaluation, evidence scoring, evidence matrix reads, and structured explanations
 - `Analyst Review`: analyst queue, final decisions, overrides with justification, information requests, audit logs, notifications, and safe websocket events
+- `Health`: application, PostgreSQL, AI-service, and storage-provider connectivity checks
 
 ## Planned Resources
 - Appeals and analyst assignment
 
 ## Prototype Policy Notice
 Phase 6 policy requirements and policy rules are ResolveX prototype assumptions for demo and product validation. They are not official legal policy, card-network rules, or issuer/acquirer operating regulations.
+
+## Implemented Authentication Endpoints
+## Implemented Health Endpoint
+### `GET /api/health`
+Returns dependency health without requiring authentication.
+
+Response:
+```json
+{
+  "status": "ok",
+  "checks": {
+    "application": { "status": "ok" },
+    "postgresql": { "status": "ok" },
+    "aiService": { "status": "ok" },
+    "storageProvider": { "status": "ok", "detail": "local" }
+  },
+  "timestamp": "2026-07-25T00:00:00.000Z"
+}
+```
+
+`status` becomes `degraded` when a dependency check fails. Details are intentionally generic and do not include secrets.
 
 ## Implemented Authentication Endpoints
 ### `POST /api/auth/register`

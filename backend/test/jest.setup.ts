@@ -9,3 +9,7 @@ process.env.EVIDENCE_UPLOAD_URL_TTL_SECONDS = '600';
 process.env.EVIDENCE_DOWNLOAD_URL_TTL_SECONDS = '300';
 process.env.AI_SERVICE_URL = 'http://localhost:8000';
 process.env.AI_SERVICE_TIMEOUT_MS = '15000';
+process.env.AI_SERVICE_RETRY_ATTEMPTS = '2';
+process.env.AI_SERVICE_RETRY_BACKOFF_MS = '0';
+process.env.AUTH_RATE_LIMIT_MAX = '1000';
+process.env.UPLOAD_RATE_LIMIT_MAX = '1000';

@@ -1,4 +1,12 @@
-import { PrismaClient, Prisma, ReasonCode, Role } from '@prisma/client';
+import {
+  CaseStatus,
+  EvidenceProcessingStatus,
+  MerchantResponseStatus,
+  Prisma,
+  PrismaClient,
+  ReasonCode,
+  Role,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -60,6 +68,38 @@ type PrototypePolicyRuleSeed = {
   title: string;
   description: string;
   severity: 'MEDIUM' | 'HIGH';
+};
+
+type DemoScenarioSeed = {
+  transaction: {
+    id: string;
+    merchantName: string;
+    amount: Prisma.Decimal;
+    currency: string;
+    transactionDate: Date;
+    status: string;
+    maskedCardLast4: string;
+  };
+  case: {
+    id: string;
+    reasonCode: ReasonCode;
+    cardMemberStatement: string;
+    merchantStatement?: string;
+    status: CaseStatus;
+  };
+  evidence: Array<{
+    id: string;
+    submittedByRole: Role;
+    evidenceType: string;
+    fileName: string;
+    facts: Array<{
+      factType: string;
+      factValue: string;
+      normalizedValue?: string;
+      confidence?: number;
+      verifiedByUser?: boolean;
+    }>;
+  }>;
 };
 
 const prototypePolicyVersion = 'prototype-v1';
@@ -387,7 +427,242 @@ const prototypePolicyRules: PrototypePolicyRuleSeed[] = [
   },
 ];
 
-async function main() {
+export const demoScenarioTransactionIds = [
+  '90000000-0000-4000-8000-000000000001',
+  '90000000-0000-4000-8000-000000000002',
+  '90000000-0000-4000-8000-000000000003',
+  '90000000-0000-4000-8000-000000000004',
+];
+
+export const demoScenarioCaseIds = [
+  '91000000-0000-4000-8000-000000000001',
+  '91000000-0000-4000-8000-000000000002',
+  '91000000-0000-4000-8000-000000000003',
+  '91000000-0000-4000-8000-000000000004',
+];
+
+const demoScenarios: DemoScenarioSeed[] = [
+  {
+    transaction: {
+      id: demoScenarioTransactionIds[0],
+      merchantName: 'Scenario A Merchant',
+      amount: new Prisma.Decimal('129.99'),
+      currency: 'USD',
+      transactionDate: new Date('2026-07-01T10:00:00.000Z'),
+      status: 'POSTED',
+      maskedCardLast4: '4242',
+    },
+    case: {
+      id: demoScenarioCaseIds[0],
+      reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+      cardMemberStatement:
+        'Scenario A: goods were not received; invoice and dispatch exist, but there is no delivery confirmation.',
+      merchantStatement:
+        'Merchant can show invoice and dispatch only; delivery confirmation is missing.',
+      status: CaseStatus.UNDER_EVALUATION,
+    },
+    evidence: [
+      {
+        id: '92000000-0000-4000-8000-000000000001',
+        submittedByRole: Role.MERCHANT,
+        evidenceType: 'invoice',
+        fileName: 'scenario-a-invoice.pdf',
+        facts: [
+          {
+            factType: 'ORDER_ID',
+            factValue: 'SCENARIO-A-ORDER',
+            confidence: 0.95,
+          },
+        ],
+      },
+      {
+        id: '92000000-0000-4000-8000-000000000002',
+        submittedByRole: Role.MERCHANT,
+        evidenceType: 'dispatch_record',
+        fileName: 'scenario-a-dispatch.pdf',
+        facts: [
+          {
+            factType: 'DISPATCHED',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.95,
+          },
+        ],
+      },
+      {
+        id: '92000000-0000-4000-8000-000000000003',
+        submittedByRole: Role.CARD_MEMBER,
+        evidenceType: 'non_delivery_statement',
+        fileName: 'scenario-a-non-delivery.pdf',
+        facts: [
+          {
+            factType: 'NON_DELIVERY_STATEMENT',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.96,
+            verifiedByUser: true,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    transaction: {
+      id: demoScenarioTransactionIds[1],
+      merchantName: 'Scenario B Merchant',
+      amount: new Prisma.Decimal('219.00'),
+      currency: 'USD',
+      transactionDate: new Date('2026-07-02T10:00:00.000Z'),
+      status: 'POSTED',
+      maskedCardLast4: '4242',
+    },
+    case: {
+      id: demoScenarioCaseIds[1],
+      reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+      cardMemberStatement:
+        'Scenario B: card member claims goods were not received, but merchant has signed delivery evidence.',
+      merchantStatement:
+        'Signed delivery confirmation matches the expected recipient and delivery location.',
+      status: CaseStatus.UNDER_EVALUATION,
+    },
+    evidence: [
+      {
+        id: '92000000-0000-4000-8000-000000000004',
+        submittedByRole: Role.MERCHANT,
+        evidenceType: 'delivery_confirmation',
+        fileName: 'scenario-b-signed-delivery.pdf',
+        facts: [
+          {
+            factType: 'DELIVERY_CONFIRMED',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.97,
+          },
+          {
+            factType: 'RECIPIENT_CONFIRMED',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.96,
+          },
+          {
+            factType: 'DELIVERY_LOCATION_MATCH',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.96,
+          },
+          {
+            factType: 'RECIPIENT_NAME',
+            factValue: 'ResolveX Card Member',
+            confidence: 0.96,
+          },
+          {
+            factType: 'DELIVERY_LOCATION',
+            factValue: '123 Demo Lane',
+            confidence: 0.96,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    transaction: {
+      id: demoScenarioTransactionIds[2],
+      merchantName: 'Scenario C Merchant',
+      amount: new Prisma.Decimal('89.75'),
+      currency: 'USD',
+      transactionDate: new Date('2026-07-03T10:00:00.000Z'),
+      status: 'POSTED',
+      maskedCardLast4: '4242',
+    },
+    case: {
+      id: demoScenarioCaseIds[2],
+      reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+      cardMemberStatement:
+        'Scenario C: delivery location conflicts with recipient evidence and confidence is below threshold.',
+      merchantStatement:
+        'Merchant delivery evidence conflicts with the card member location evidence.',
+      status: CaseStatus.UNDER_EVALUATION,
+    },
+    evidence: [
+      {
+        id: '92000000-0000-4000-8000-000000000005',
+        submittedByRole: Role.MERCHANT,
+        evidenceType: 'delivery_confirmation',
+        fileName: 'scenario-c-delivery.pdf',
+        facts: [
+          {
+            factType: 'DELIVERY_CONFIRMED',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.62,
+          },
+          {
+            factType: 'DELIVERY_LOCATION',
+            factValue: 'Front desk',
+            confidence: 0.62,
+          },
+        ],
+      },
+      {
+        id: '92000000-0000-4000-8000-000000000006',
+        submittedByRole: Role.CARD_MEMBER,
+        evidenceType: 'location_dispute',
+        fileName: 'scenario-c-location-dispute.pdf',
+        facts: [
+          {
+            factType: 'DELIVERY_LOCATION',
+            factValue: 'Parcel locker',
+            confidence: 0.67,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    transaction: {
+      id: demoScenarioTransactionIds[3],
+      merchantName: 'Scenario D Merchant',
+      amount: new Prisma.Decimal('310.50'),
+      currency: 'USD',
+      transactionDate: new Date('2026-07-04T10:00:00.000Z'),
+      status: 'REFUND_PROMISED',
+      maskedCardLast4: '4242',
+    },
+    case: {
+      id: demoScenarioCaseIds[3],
+      reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+      cardMemberStatement:
+        'Scenario D: merchant promised a refund, but no completed refund transaction exists.',
+      merchantStatement:
+        'Merchant communication promised a refund; processor completion is absent.',
+      status: CaseStatus.UNDER_EVALUATION,
+    },
+    evidence: [
+      {
+        id: '92000000-0000-4000-8000-000000000007',
+        submittedByRole: Role.CARD_MEMBER,
+        evidenceType: 'refund_promise',
+        fileName: 'scenario-d-refund-promise.pdf',
+        facts: [
+          {
+            factType: 'REFUND_PROMISED',
+            factValue: 'true',
+            normalizedValue: 'true',
+            confidence: 0.95,
+          },
+          {
+            factType: 'REFUND_AMOUNT',
+            factValue: '310.50',
+            normalizedValue: '310.50',
+            confidence: 0.93,
+          },
+        ],
+      },
+    ],
+  },
+];
+
+export async function seedDemoData() {
   const seededUsers = new Map<string, { id: string }>();
 
   for (const user of demoUsers) {
@@ -548,19 +823,116 @@ async function main() {
     });
   }
 
+  await prisma.timelineEvent.deleteMany({
+    where: { caseId: { in: demoScenarioCaseIds } },
+  });
+  await prisma.disputeCase.deleteMany({
+    where: { id: { in: demoScenarioCaseIds } },
+  });
+  await prisma.transaction.deleteMany({
+    where: { id: { in: demoScenarioTransactionIds } },
+  });
+
+  for (const scenario of demoScenarios) {
+    await prisma.transaction.create({
+      data: {
+        ...scenario.transaction,
+        cardMemberId: cardMember.id,
+        merchantId: merchant.id,
+      },
+    });
+
+    const disputeCase = await prisma.disputeCase.create({
+      data: {
+        id: scenario.case.id,
+        transactionId: scenario.transaction.id,
+        cardMemberId: cardMember.id,
+        merchantId: merchant.id,
+        reasonCode: scenario.case.reasonCode,
+        cardMemberStatement: scenario.case.cardMemberStatement,
+        merchantStatement: scenario.case.merchantStatement ?? null,
+        merchantResponseDate: new Date('2026-07-10T12:00:00.000Z'),
+        merchantResponseStatus: MerchantResponseStatus.SUBMITTED,
+        status: scenario.case.status,
+        responseDeadline: new Date('2026-07-31T00:00:00.000Z'),
+      },
+    });
+
+    for (const evidence of scenario.evidence) {
+      await prisma.evidenceItem.create({
+        data: {
+          id: evidence.id,
+          caseId: disputeCase.id,
+          submittedByUserId:
+            evidence.submittedByRole === Role.MERCHANT
+              ? merchant.id
+              : cardMember.id,
+          submittedByRole: evidence.submittedByRole,
+          evidenceType: evidence.evidenceType,
+          fileName: evidence.fileName,
+          mimeType: 'application/pdf',
+          sizeBytes: 2048,
+          storageKey: [
+            'demo-evidence',
+            disputeCase.id,
+            evidence.id,
+            evidence.fileName,
+          ].join('/'),
+          fileHash: '0'.repeat(64),
+          processingStatus: EvidenceProcessingStatus.PROCESSED,
+          extractionConfidence:
+            evidence.facts.reduce(
+              (sum, fact) => sum + (fact.confidence ?? 0.9),
+              0,
+            ) / evidence.facts.length,
+          extractedFacts: {
+            create: evidence.facts.map((fact) => ({
+              factType: fact.factType,
+              factValue: fact.factValue,
+              normalizedValue: fact.normalizedValue ?? null,
+              confidence: fact.confidence ?? 0.9,
+              sourcePage: 1,
+              verifiedByUser: fact.verifiedByUser ?? false,
+              correctedByUser: false,
+            })),
+          },
+        },
+      });
+    }
+
+    await prisma.timelineEvent.create({
+      data: {
+        caseId: disputeCase.id,
+        eventType: 'DEMO_SCENARIO_SEEDED',
+        description: `Seeded stable judging scenario ${scenario.transaction.merchantName}.`,
+        performedBy: null,
+        metadata: {
+          scenarioCaseId: disputeCase.id,
+          reasonCode: scenario.case.reasonCode,
+        },
+      },
+    });
+  }
+
   console.log(
-    'Seeded ResolveX prototype users, transactions, policy requirements, and policy rules.',
+    'Seeded ResolveX prototype users, transactions, policy requirements, policy rules, and stable demo scenarios.',
   );
   console.log(
     'Development-only fallback password is ResolveXDemo123! when no RESOLVEX_DEMO_* password is set.',
   );
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+export async function disconnectSeedPrisma() {
+  await prisma.$disconnect();
+}
+
+if (require.main === module) {
+  seedDemoData()
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

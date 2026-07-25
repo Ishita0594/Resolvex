@@ -42,6 +42,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
           : 'Internal server error'),
       timestamp: new Date().toISOString(),
       path: request.url,
+      requestId: request.requestId,
     });
   }
 
