@@ -1,6 +1,6 @@
 # API Contract
 
-This file documents the API surface for ResolveX. Phase 4 implements authentication, card-member transaction reads, dispute creation, dispute reads, dispute timelines, merchant dispute reads, database-backed prototype policy requirements, structured merchant responses, and secure evidence upload metadata.
+This file documents the API surface for ResolveX. Phase 6 implements authentication, card-member transaction reads, dispute creation, dispute reads, dispute timelines, merchant dispute reads, database-backed prototype policy requirements, structured merchant responses, secure evidence upload metadata, AI fact extraction, and deterministic prototype policy evaluation.
 
 ## Conventions
 - Base path: `/api`
@@ -27,13 +27,13 @@ This file documents the API surface for ResolveX. Phase 4 implements authenticat
 - `Policy Requirements`: reason-specific prototype merchant evidence checklists loaded from PostgreSQL
 - `Merchant Responses`: structured merchant response submission
 - `Evidence`: upload target creation, local multipart upload support, confirmation, metadata reads, temporary downloads, AI processing, extracted fact reads and updates, retry, and deletion
+- `Policy Evaluation`: deterministic rule evaluation, evidence scoring, evidence matrix reads, and structured explanations
 
 ## Planned Resources
-- `Policy Evaluation`: deterministic rule evaluation and explanation
 - `Analyst Review`: human review queue, decisions, appeals
 
 ## Prototype Policy Notice
-Phase 3 policy requirements are ResolveX prototype policy rules for demo and product validation. They are not official legal policy, card-network rules, or issuer/acquirer operating regulations.
+Phase 6 policy requirements and policy rules are ResolveX prototype assumptions for demo and product validation. They are not official legal policy, card-network rules, or issuer/acquirer operating regulations.
 
 ## Implemented Authentication Endpoints
 ### `POST /api/auth/register`
@@ -240,7 +240,6 @@ All API errors use:
 - `PATCH /api/cases/:caseId/status`
 - `POST /api/cases/:caseId/evidence`
 - `GET /api/cases/:caseId/evidence`
-- `POST /api/cases/:caseId/evaluate`
 - `POST /api/cases/:caseId/analyst-review`
 
 ## Evidence Requirement
@@ -497,6 +496,86 @@ Response:
   }
 ]
 ```
+
+## Implemented Policy Evaluation Endpoints
+Policy evaluation endpoints require a JWT bearer token. Analysts can run evaluation. Card members, merchants, and analysts can read evaluation outputs for cases they can access.
+
+The deterministic engine stores `EvidenceScore` rows and appends a `DecisionRecord`. `DecisionRecord.modelMetadata.aiDecisionUsed` is always `false`; AI and Hugging Face outputs may supply extracted facts only.
+
+Evidence quality score:
+- source reliability: 25%
+- directness: 25%
+- completeness: 20%
+- consistency: 20%
+- timeliness: 10%
+
+Automatic recommendation gate defaults:
+- `POLICY_AUTO_CONFIDENCE_THRESHOLD=85`
+- `POLICY_AUTO_DECISION_MARGIN_THRESHOLD=20`
+- `POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD=0.8`
+
+Automation is blocked when confidence or margin is too low, mandatory requirements are not configured, high-severity contradictions are unresolved, critical facts are not verified or above confidence threshold, a policy exception is present, or an applied rule requires review.
+
+### `POST /api/disputes/:caseId/evaluate`
+Runs deterministic prototype policy evaluation for an analyst-visible case.
+
+Response excerpt:
+```json
+{
+  "id": "uuid",
+  "caseId": "uuid",
+  "recommendedOutcome": "MERCHANT_SUPPORTED",
+  "cardMemberScore": 0,
+  "merchantScore": 96,
+  "confidence": 96,
+  "decisionMargin": 96,
+  "decisionType": "AUTOMATED_RECOMMENDATION",
+  "policyVersion": "prototype-v1",
+  "modelMetadata": {
+    "aiDecisionUsed": false,
+    "deterministicPolicyEngine": true
+  },
+  "explanationData": {
+    "disputeCategory": "GOODS_NOT_RECEIVED",
+    "appliedRuleIdentifiers": ["PX-GNR-002"],
+    "recommendedOutcome": "MERCHANT_SUPPORTED",
+    "confidence": 96,
+    "humanReviewReason": null
+  },
+  "createdAt": "2026-07-25T00:00:00.000Z"
+}
+```
+
+### `GET /api/disputes/:caseId/evaluation`
+Returns the latest decision record for a visible case.
+
+### `GET /api/disputes/:caseId/evidence-matrix`
+Returns active requirements and stored evidence scores grouped by requirement.
+
+### `GET /api/disputes/:caseId/explanation`
+Returns a structured explanation generated from facts and rule results:
+- dispute category
+- what needed to be proven
+- evidence submitted by each party
+- verified facts
+- missing evidence
+- contradictions
+- applied rule identifiers
+- recommended outcome
+- confidence
+- human review reason when applicable
+
+Prototype rule identifiers:
+- `PX-GNR-001`: dispatch alone does not prove delivery.
+- `PX-GNR-002`: verified delivery confirmation plus recipient or location confirmation supports merchant.
+- `PX-GNR-003`: missing delivery proof plus consistent non-delivery evidence supports card member.
+- `PX-GNR-004`: conflicting location or recipient evidence requires human review.
+- `PX-REF-001`: refund promise without completed refund record supports card member.
+- `PX-REF-002`: matching completed refund transaction supports merchant.
+- `PX-REF-003`: amount/date/reference contradictions require review.
+- `PX-CAN-001`: timely valid cancellation plus no service delivery and no refund supports card member.
+- `PX-CAN-002`: late cancellation after clearly accepted policy may support merchant.
+- `PX-CAN-003`: unclear timing or policy acceptance requires review.
 
 ## AI Service Endpoints
 The AI service is a separate FastAPI process. It extracts and classifies reviewable evidence facts only.

@@ -1,17 +1,19 @@
 # Database Design
 
-Phase 4 defines and implements the authentication, transaction, dispute case, timeline, merchant response, prototype policy requirement, evidence metadata, and extracted fact portions of the data model in Prisma.
+Phase 6 defines and implements the authentication, transaction, dispute case, timeline, merchant response, prototype policy requirement, evidence metadata, extracted fact, evidence score, policy rule, and decision record portions of the data model in Prisma.
 
 ## Core Entities
 - `User`: authenticated user with a role.
 - `Transaction`: posted or dispute-relevant transaction visible to its card member.
 - `DisputeCase`: disputed transaction case and current workflow status.
 - `PolicyRequirement`: database-backed prototype evidence checklist row for one dispute reason.
+- `PolicyRule`: versioned prototype deterministic rule catalogue row.
 - `EvidenceItem`: uploaded evidence metadata and internal storage reference.
 - `ExtractedFact`: structured facts extracted from one evidence item for later AI and policy processing.
+- `EvidenceScore`: five-factor deterministic quality score for one evidence item against one requirement.
+- `DecisionRecord`: stored deterministic recommendation, scores, gate metadata, and structured explanation.
 - `TimelineEvent`: append-only case timeline event.
 - `TransactionSnapshot`: future immutable transaction details relevant to policy evaluation.
-- `PolicyEvaluation`: deterministic rule results and referenced evidence.
 - `AnalystReview`: human review notes and final action.
 
 ## Key Relationships
@@ -24,7 +26,8 @@ Phase 4 defines and implements the authentication, transaction, dispute case, ti
 - A future `DisputeCase` may have one immutable `TransactionSnapshot`.
 - A `DisputeCase` has many `EvidenceItem` records.
 - An `EvidenceItem` belongs to the submitting user and can produce many `ExtractedFact` records.
-- A `DisputeCase` can have many `PolicyEvaluation` records.
+- A `DisputeCase` can have many `EvidenceScore` and `DecisionRecord` records.
+- A `PolicyRequirement` can have many `EvidenceScore` records.
 - A `DisputeCase` can have zero or more `AnalystReview` records.
 
 ## Implemented Fields
@@ -104,6 +107,46 @@ Phase 4 defines and implements the authentication, transaction, dispute case, ti
 - `correctedByUser`: whether a user corrected the extracted fact.
 - `createdAt`, `updatedAt`: audit timestamps.
 
+### `PolicyRule`
+- `id`: UUID primary key.
+- `ruleId`: stable rule identifier such as `PX-GNR-002`.
+- `reasonCode`: supported dispute category.
+- `title`: short rule name.
+- `description`: prototype assumption text.
+- `prototypeAssumption`: always true for the current Phase 6 rule set.
+- `severity`: prototype severity label used for review routing context.
+- `policyVersion`: version label, currently `prototype-v1`.
+- `active`: whether the rule is active.
+- `createdAt`, `updatedAt`: audit timestamps.
+
+### `EvidenceScore`
+- `id`: UUID primary key.
+- `caseId`: UUID reference to the dispute case.
+- `evidenceId`: UUID reference to the scored evidence item.
+- `requirementId`: UUID reference to the matched policy requirement.
+- `sourceReliability`, `directness`, `completeness`, `consistency`, `timeliness`: integer component scores from `0` to `100`.
+- `finalScore`: weighted score from `0` to `100`.
+- `supportDirection`: `SUPPORTS_CARD_MEMBER`, `SUPPORTS_MERCHANT`, `NEUTRAL`, or `CONTRADICTORY`.
+- `createdAt`: audit timestamp.
+
+Phase 6 prototype score weights:
+- source reliability: 25%
+- directness: 25%
+- completeness: 20%
+- consistency: 20%
+- timeliness: 10%
+
+### `DecisionRecord`
+- `id`: UUID primary key.
+- `caseId`: UUID reference to the dispute case.
+- `recommendedOutcome`: `CARD_MEMBER_SUPPORTED`, `MERCHANT_SUPPORTED`, or `HUMAN_REVIEW_REQUIRED`.
+- `cardMemberScore`, `merchantScore`, `confidence`, `decisionMargin`: deterministic integer score outputs.
+- `decisionType`: `AUTOMATED_RECOMMENDATION` or `HUMAN_DECISION`.
+- `policyVersion`: policy version used for the decision.
+- `modelMetadata`: JSON metadata proving no AI model directly decided the outcome.
+- `explanationData`: structured explanation JSON generated from facts and rule results.
+- `createdAt`: audit timestamp.
+
 ## Seeded Prototype Policy Requirements
 Phase 3 seeds prototype policy rules for all supported dispute categories. These rows are for ResolveX product validation only and are not official legal policy.
 
@@ -130,6 +173,25 @@ Phase 3 seeds prototype policy rules for all supported dispute categories. These
 - `cancellation_confirmation`
 - `refund_confirmation`
 
+## Seeded Prototype Policy Rules
+Phase 6 seeds versioned prototype rules in PostgreSQL. All rules are labelled as assumptions for product validation.
+
+`GOODS_NOT_RECEIVED`:
+- `PX-GNR-001`: dispatch alone does not prove delivery.
+- `PX-GNR-002`: verified delivery confirmation and recipient/location confirmation support merchant.
+- `PX-GNR-003`: missing delivery proof with consistent non-delivery evidence supports card member.
+- `PX-GNR-004`: conflicting location or recipient evidence requires human review.
+
+`REFUND_NOT_PROCESSED`:
+- `PX-REF-001`: refund promise without completed refund record supports card member.
+- `PX-REF-002`: matching completed refund transaction supports merchant.
+- `PX-REF-003`: amount, date, or reference contradictions require review.
+
+`CANCELLED_GOODS_OR_SERVICES`:
+- `PX-CAN-001`: timely valid cancellation plus no service delivery and no refund supports card member.
+- `PX-CAN-002`: late cancellation after clearly accepted policy may support merchant.
+- `PX-CAN-003`: unclear timing or policy acceptance requires review.
+
 ## Data Safety
 Do not store real card numbers, bank credentials, or personal data in development fixtures. Use tokenized transaction references and synthetic demo data.
 
@@ -142,4 +204,4 @@ Case and resolution records must preserve:
 - Timestamp
 - Human review reason when applicable
 
-Phase 2 records initial status transitions through `TimelineEvent` entries when a card member creates a dispute. Phase 3 records `MERCHANT_RESPONSE_SUBMITTED` and `CASE_STATUS_CHANGED` timeline events when a merchant submits a valid structured response. Phase 4 records `EVIDENCE_UPLOAD_TARGET_CREATED`, `EVIDENCE_UPLOADED`, and `EVIDENCE_DELETED` timeline events for evidence auditability. Phase 5 records `EVIDENCE_PROCESSED`, `EVIDENCE_PROCESSING_FAILED`, `EVIDENCE_PROCESSING_RETRIED`, and `EVIDENCE_PROCESSING_RETRY_FAILED` events for AI extraction attempts.
+Phase 2 records initial status transitions through `TimelineEvent` entries when a card member creates a dispute. Phase 3 records `MERCHANT_RESPONSE_SUBMITTED` and `CASE_STATUS_CHANGED` timeline events when a merchant submits a valid structured response. Phase 4 records `EVIDENCE_UPLOAD_TARGET_CREATED`, `EVIDENCE_UPLOADED`, and `EVIDENCE_DELETED` timeline events for evidence auditability. Phase 5 records `EVIDENCE_PROCESSED`, `EVIDENCE_PROCESSING_FAILED`, `EVIDENCE_PROCESSING_RETRIED`, and `EVIDENCE_PROCESSING_RETRY_FAILED` events for AI extraction attempts. Phase 6 records `POLICY_EVALUATION_COMPLETED` for deterministic recommendation attempts.

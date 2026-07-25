@@ -28,5 +28,14 @@ ResolveX assists with already-disputed transactions by collecting evidence, extr
 6. Evidence becomes `PROCESSED` with extraction confidence, or `FAILED` with an audit timeline event.
 7. Users can correct and verify facts through the backend. Corrected or verified facts are preserved across later processing.
 
+## Phase 6 Policy Evaluation Flow
+1. An analyst calls `POST /api/disputes/:caseId/evaluate`.
+2. The backend loads active `prototype-v1` requirements and `PolicyRule` rows from PostgreSQL.
+3. Each matched evidence item receives the same five-factor quality score regardless of submitting party: source reliability, directness, completeness, consistency, and timeliness.
+4. Deterministic rule code applies versioned prototype rule IDs to structured facts.
+5. The automation gate requires confidence >= 85, decision margin >= 20, mandatory requirements configured/evaluated, no unresolved high-severity contradiction, critical facts verified or above confidence threshold, and no policy exception.
+6. The backend stores `EvidenceScore` rows and appends a `DecisionRecord`.
+7. Explanations are generated from structured facts, missing requirements, contradictions, and applied rule identifiers.
+
 ## Core Boundary
 AI models may assist evidence extraction and explanation, but they must not directly decide the winning party. Resolution outcomes must come from deterministic policy rules.
