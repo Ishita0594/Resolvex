@@ -1,6 +1,6 @@
 # API Contract
 
-This file documents the API surface for ResolveX. Phase 2 implements authentication, card-member transaction reads, dispute creation, dispute reads, and dispute timelines.
+This file documents the API surface for ResolveX. Phase 4 implements authentication, card-member transaction reads, dispute creation, dispute reads, dispute timelines, merchant dispute reads, database-backed prototype policy requirements, structured merchant responses, and secure evidence upload metadata.
 
 ## Conventions
 - Base path: `/api`
@@ -23,11 +23,17 @@ This file documents the API surface for ResolveX. Phase 2 implements authenticat
 - `Auth`: register, login, authenticated profile
 - `Transactions`: card-member transaction list and detail reads
 - `Disputes`: card-member dispute creation, list, detail, and timeline reads
+- `Merchant Disputes`: merchant-assigned dispute list and detail reads
+- `Policy Requirements`: reason-specific prototype merchant evidence checklists loaded from PostgreSQL
+- `Merchant Responses`: structured merchant response submission
+- `Evidence`: upload target creation, local multipart upload support, confirmation, metadata reads, temporary downloads, extracted fact updates, and deletion
 
 ## Planned Resources
-- `Evidence`: uploads, extracted fields, evidence review status
 - `Policy Evaluation`: deterministic rule evaluation and explanation
 - `Analyst Review`: human review queue, decisions, appeals
+
+## Prototype Policy Notice
+Phase 3 policy requirements are ResolveX prototype policy rules for demo and product validation. They are not official legal policy, card-network rules, or issuer/acquirer operating regulations.
 
 ## Implemented Authentication Endpoints
 ### `POST /api/auth/register`
@@ -166,6 +172,8 @@ Response:
   "reasonCode": "GOODS_NOT_RECEIVED",
   "cardMemberStatement": "The package was never delivered to my address.",
   "merchantStatement": null,
+  "merchantResponseDate": null,
+  "merchantResponseStatus": "PENDING",
   "status": "AWAITING_MERCHANT",
   "responseDeadline": "2026-07-31T00:00:00.000Z",
   "createdAt": "2026-07-24T00:00:00.000Z",
@@ -243,3 +251,212 @@ Every decision response must include:
 - Structured evidence references
 - Confidence indicators
 - Human review reason when applicable
+
+## Implemented Merchant Endpoints
+All merchant endpoints require a JWT bearer token and the `MERCHANT` role.
+
+### `GET /api/merchant/disputes`
+Returns only disputes assigned to the authenticated merchant account.
+
+Rules:
+- A merchant sees only cases where `DisputeCase.merchantId` matches their user ID.
+- Card members and analysts cannot use this endpoint.
+
+### `GET /api/merchant/disputes/:caseId`
+Returns one dispute only when it is assigned to the authenticated merchant.
+
+Rules:
+- A dispute assigned to another merchant returns `404`.
+- A missing dispute returns `404`.
+
+### `GET /api/disputes/:caseId/requirements`
+Returns active prototype policy requirements for the case reason.
+
+Response:
+```json
+[
+  {
+    "id": "uuid",
+    "reasonCode": "GOODS_NOT_RECEIVED",
+    "requirementKey": "delivery_confirmation",
+    "requirementName": "Delivery confirmation",
+    "description": "Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides carrier delivery confirmation or tracking proof.",
+    "acceptedEvidenceTypes": ["delivery_confirmation", "tracking_record", "carrier_proof"],
+    "weight": 25,
+    "isMandatory": true,
+    "policyVersion": "prototype-v1",
+    "active": true,
+    "createdAt": "2026-07-24T00:00:00.000Z",
+    "updatedAt": "2026-07-24T00:00:00.000Z"
+  }
+]
+```
+
+Rules:
+- Requirements are loaded from PostgreSQL `PolicyRequirement` rows, not hardcoded in controllers.
+- The authenticated merchant must be assigned to the dispute case.
+- Phase 3 seeds prototype requirements for `GOODS_NOT_RECEIVED`, `REFUND_NOT_PROCESSED`, and `CANCELLED_GOODS_OR_SERVICES`.
+
+### `POST /api/disputes/:caseId/merchant-response`
+Submits a final structured merchant response for an assigned dispute.
+
+Request:
+```json
+{
+  "merchantStatement": "We shipped the goods to the card member address and have attached shipment and delivery proof.",
+  "evidence": [
+    {
+      "requirementKey": "delivery_confirmation",
+      "evidenceType": "tracking_record",
+      "value": "Carrier tracking shows delivery on 2026-07-02.",
+      "metadata": {
+        "trackingNumber": "DEMO-TRACK-123"
+      }
+    }
+  ]
+}
+```
+
+Rules:
+- Only merchants can submit merchant responses.
+- The merchant must be assigned to the dispute case.
+- `merchantStatement` is required.
+- Submitted evidence must match active prototype policy requirements for the case reason.
+- All mandatory requirements for the reason must be present.
+- Evidence types must be accepted by the matching `PolicyRequirement.acceptedEvidenceTypes`.
+- The case must be in `AWAITING_MERCHANT`.
+- The response must be before `responseDeadline`, unless a future analyst workflow marks the merchant response as `REOPENED`.
+- Duplicate final responses are rejected after `merchantResponseStatus` becomes `SUBMITTED`.
+- Valid submission updates `merchantStatement`, `merchantResponseDate`, `merchantResponseStatus`, and moves status to `EVIDENCE_PROCESSING`.
+- Valid submission creates `MERCHANT_RESPONSE_SUBMITTED` and `CASE_STATUS_CHANGED` timeline events.
+
+## Implemented Evidence Endpoints
+Evidence endpoints require a JWT bearer token unless the endpoint is a short-lived local download-content URL generated by `GET /api/evidence/:evidenceId/download`.
+
+Allowed file types:
+- PDF: `application/pdf` with `.pdf`
+- PNG: `image/png` with `.png`
+- JPG/JPEG: `image/jpeg` with `.jpg` or `.jpeg`
+
+Rules:
+- `STORAGE_PROVIDER=local` creates a local multipart upload target.
+- `STORAGE_PROVIDER=s3` creates a short-lived S3 presigned `PUT` upload target.
+- `MAX_EVIDENCE_FILE_SIZE_BYTES` limits evidence file size.
+- File names are sanitized before persistence.
+- Internal storage keys are not returned by evidence metadata endpoints.
+- Card members and merchants can upload only to cases they belong to.
+- Card members and merchants can read evidence for cases they belong to.
+- Analysts can read evidence for review workflows; assignment modeling is reserved for a later analyst phase.
+- Card members cannot modify merchant-submitted evidence, and merchants cannot modify card-member-submitted evidence.
+- Deletes are allowed only before evaluation locks the case, currently `DRAFT`, `SUBMITTED`, `AWAITING_MERCHANT`, and `EVIDENCE_PROCESSING`.
+- Upload target creation, upload confirmation, and deletion create timeline events with audit-ready metadata.
+
+### `POST /api/disputes/:caseId/evidence/upload-target`
+Creates an evidence metadata row and returns the upload target.
+
+Request:
+```json
+{
+  "evidenceType": "delivery_confirmation",
+  "fileName": "delivery-proof.pdf",
+  "mimeType": "application/pdf",
+  "sizeBytes": 204800
+}
+```
+
+Local response:
+```json
+{
+  "evidenceId": "uuid",
+  "uploadUrl": "http://localhost:3000/api/evidence/uuid/local-upload",
+  "method": "POST",
+  "headers": {},
+  "fields": {
+    "fileField": "file"
+  },
+  "expiresAt": "2026-07-25T10:10:00.000Z"
+}
+```
+
+S3 response uses the same shape, with `method` set to `PUT`, `uploadUrl` set to a presigned URL, and required headers included in `headers`.
+
+### `POST /api/evidence/:evidenceId/local-upload`
+Local-development multipart upload target. Submit a `multipart/form-data` request with file field `file`. This route is returned only by local upload targets and requires the same authenticated submitting user.
+
+Response:
+```json
+{
+  "fileHash": "sha256-hex"
+}
+```
+
+### `POST /api/disputes/:caseId/evidence/confirm`
+Confirms that the object exists and persists a SHA-256 hash. Local storage calculates the hash if omitted. S3 confirmation accepts a caller-provided hash when supplied.
+
+Request:
+```json
+{
+  "evidenceId": "uuid",
+  "fileHash": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7c75a5a5efcff8e"
+}
+```
+
+Response omits the internal `storageKey`:
+```json
+{
+  "id": "uuid",
+  "caseId": "uuid",
+  "submittedByUserId": "uuid",
+  "submittedByRole": "CARD_MEMBER",
+  "evidenceType": "delivery_confirmation",
+  "fileName": "delivery-proof.pdf",
+  "mimeType": "application/pdf",
+  "sizeBytes": 204800,
+  "fileHash": "sha256-hex",
+  "processingStatus": "UPLOADED",
+  "extractionConfidence": null,
+  "createdAt": "2026-07-25T10:00:00.000Z",
+  "updatedAt": "2026-07-25T10:01:00.000Z",
+  "facts": []
+}
+```
+
+### `GET /api/disputes/:caseId/evidence`
+Lists evidence metadata for one visible case.
+
+### `GET /api/evidence/:evidenceId`
+Returns one visible evidence metadata record with extracted facts.
+
+### `GET /api/evidence/:evidenceId/download`
+Returns a short-lived temporary download target.
+
+Response:
+```json
+{
+  "downloadUrl": "temporary-url",
+  "expiresAt": "2026-07-25T10:05:00.000Z"
+}
+```
+
+### `PATCH /api/evidence/:evidenceId/facts`
+Replaces extracted facts for one evidence item. The submitting party can update its own evidence facts; analysts may update facts during review workflows.
+
+Request:
+```json
+{
+  "facts": [
+    {
+      "factType": "tracking_number",
+      "factValue": "DEMO-TRACK-123",
+      "normalizedValue": "DEMO-TRACK-123",
+      "confidence": 0.92,
+      "sourcePage": 1,
+      "verifiedByUser": true,
+      "correctedByUser": false
+    }
+  ]
+}
+```
+
+### `DELETE /api/evidence/:evidenceId`
+Deletes an evidence metadata row and underlying storage object when the user owns the evidence and the case status still allows evidence changes. Successful deletion returns `204`.

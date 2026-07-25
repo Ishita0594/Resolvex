@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { validateEnv } from './config/env.validation';
 import { DisputesModule } from './disputes/disputes.module';
+import { EvidenceModule } from './evidence/evidence.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { UsersModule } from './users/users.module';
@@ -18,6 +19,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     TransactionsModule,
     DisputesModule,
+    EvidenceModule,
   ],
 })
 export class AppModule {}

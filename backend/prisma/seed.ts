@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, Role } from '@prisma/client';
+import { PrismaClient, Prisma, ReasonCode, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -41,6 +41,191 @@ const demoUsers = [
       process.env.RESOLVEX_DEMO_MEMBER_PASSWORD ??
       process.env.RESOLVEX_DEMO_PASSWORD ??
       developmentOnlyFallbackPassword,
+  },
+];
+
+type PrototypePolicyRequirementSeed = {
+  reasonCode: ReasonCode;
+  requirementKey: string;
+  requirementName: string;
+  description: string;
+  acceptedEvidenceTypes: string[];
+  weight: number;
+  isMandatory: boolean;
+};
+
+const prototypePolicyVersion = 'prototype-v1';
+
+const prototypePolicyRequirements: PrototypePolicyRequirementSeed[] = [
+  {
+    reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+    requirementKey: 'invoice',
+    requirementName: 'Invoice or order record',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the invoice or order record for the disputed goods.',
+    acceptedEvidenceTypes: ['invoice', 'order_record', 'receipt'],
+    weight: 20,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+    requirementKey: 'dispatch_record',
+    requirementName: 'Dispatch record',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides a dispatch, shipment, or fulfillment record.',
+    acceptedEvidenceTypes: ['dispatch_record', 'shipping_manifest', 'fulfillment_record'],
+    weight: 20,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+    requirementKey: 'delivery_confirmation',
+    requirementName: 'Delivery confirmation',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides carrier delivery confirmation or tracking proof.',
+    acceptedEvidenceTypes: ['delivery_confirmation', 'tracking_record', 'carrier_proof'],
+    weight: 25,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+    requirementKey: 'recipient_confirmation',
+    requirementName: 'Recipient confirmation',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides recipient signature, pickup confirmation, or receipt acknowledgement.',
+    acceptedEvidenceTypes: ['signature', 'pickup_confirmation', 'receipt_acknowledgement'],
+    weight: 20,
+    isMandatory: false,
+  },
+  {
+    reasonCode: ReasonCode.GOODS_NOT_RECEIVED,
+    requirementKey: 'verified_delivery_location',
+    requirementName: 'Verified delivery location',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides evidence linking delivery to the expected location.',
+    acceptedEvidenceTypes: ['address_match', 'geolocation_record', 'delivery_photo'],
+    weight: 15,
+    isMandatory: false,
+  },
+  {
+    reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+    requirementKey: 'purchase_record',
+    requirementName: 'Purchase record',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the original purchase record.',
+    acceptedEvidenceTypes: ['purchase_record', 'receipt', 'invoice'],
+    weight: 15,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+    requirementKey: 'refund_initiation_record',
+    requirementName: 'Refund initiation record',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides evidence that a refund was initiated.',
+    acceptedEvidenceTypes: ['refund_initiation_record', 'refund_request_log', 'processor_record'],
+    weight: 20,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+    requirementKey: 'refund_reference',
+    requirementName: 'Refund reference',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides a refund reference, authorization, or processor trace.',
+    acceptedEvidenceTypes: ['refund_reference', 'authorization_code', 'processor_trace'],
+    weight: 15,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+    requirementKey: 'refund_amount',
+    requirementName: 'Refund amount',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the refund amount and currency.',
+    acceptedEvidenceTypes: ['refund_amount', 'refund_receipt', 'processor_record'],
+    weight: 15,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+    requirementKey: 'refund_processing_date',
+    requirementName: 'Refund processing date',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the date the refund was processed or submitted.',
+    acceptedEvidenceTypes: ['processing_date', 'refund_receipt', 'processor_record'],
+    weight: 15,
+    isMandatory: false,
+  },
+  {
+    reasonCode: ReasonCode.REFUND_NOT_PROCESSED,
+    requirementKey: 'completed_refund_transaction',
+    requirementName: 'Completed refund transaction',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides completed refund transaction evidence where available.',
+    acceptedEvidenceTypes: ['completed_refund_transaction', 'settlement_record', 'processor_record'],
+    weight: 20,
+    isMandatory: false,
+  },
+  {
+    reasonCode: ReasonCode.CANCELLED_GOODS_OR_SERVICES,
+    requirementKey: 'cancellation_request',
+    requirementName: 'Cancellation request',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the card member cancellation request or cancellation contact record.',
+    acceptedEvidenceTypes: ['cancellation_request', 'support_ticket', 'email'],
+    weight: 15,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.CANCELLED_GOODS_OR_SERVICES,
+    requirementKey: 'cancellation_date',
+    requirementName: 'Cancellation date',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the date cancellation was requested or confirmed.',
+    acceptedEvidenceTypes: ['cancellation_date', 'support_ticket', 'system_log'],
+    weight: 15,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.CANCELLED_GOODS_OR_SERVICES,
+    requirementKey: 'accepted_cancellation_policy',
+    requirementName: 'Accepted cancellation policy',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides the cancellation policy accepted at purchase or booking.',
+    acceptedEvidenceTypes: ['terms_acceptance', 'policy_snapshot', 'checkout_record'],
+    weight: 20,
+    isMandatory: true,
+  },
+  {
+    reasonCode: ReasonCode.CANCELLED_GOODS_OR_SERVICES,
+    requirementKey: 'service_delivery_record',
+    requirementName: 'Service delivery record',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides delivery, attendance, booking, or service fulfillment evidence.',
+    acceptedEvidenceTypes: ['service_delivery_record', 'attendance_record', 'booking_record'],
+    weight: 20,
+    isMandatory: false,
+  },
+  {
+    reasonCode: ReasonCode.CANCELLED_GOODS_OR_SERVICES,
+    requirementKey: 'cancellation_confirmation',
+    requirementName: 'Cancellation confirmation',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides cancellation confirmation sent to or received from the card member.',
+    acceptedEvidenceTypes: ['cancellation_confirmation', 'email', 'support_ticket'],
+    weight: 15,
+    isMandatory: false,
+  },
+  {
+    reasonCode: ReasonCode.CANCELLED_GOODS_OR_SERVICES,
+    requirementKey: 'refund_confirmation',
+    requirementName: 'Refund confirmation',
+    description:
+      'Prototype ResolveX policy rule, not official legal or card-network policy: merchant provides refund confirmation if the cancellation produced a refund.',
+    acceptedEvidenceTypes: ['refund_confirmation', 'refund_reference', 'processor_record'],
+    weight: 15,
+    isMandatory: false,
   },
 ];
 
@@ -153,10 +338,33 @@ async function main() {
     });
   }
 
-  console.log('Seeded ResolveX prototype users and transactions.');
-  console.log(
-    'Development-only fallback password is ResolveXDemo123! when no RESOLVEX_DEMO_* password is set.',
-  );
+  for (const requirement of prototypePolicyRequirements) {
+    await prisma.policyRequirement.upsert({
+      where: {
+        reasonCode_requirementKey_policyVersion: {
+          reasonCode: requirement.reasonCode,
+          requirementKey: requirement.requirementKey,
+          policyVersion: prototypePolicyVersion,
+        },
+      },
+      update: {
+        requirementName: requirement.requirementName,
+        description: requirement.description,
+        acceptedEvidenceTypes: requirement.acceptedEvidenceTypes,
+        weight: requirement.weight,
+        isMandatory: requirement.isMandatory,
+        active: true,
+      },
+      create: {
+        ...requirement,
+        policyVersion: prototypePolicyVersion,
+        active: true,
+      },
+    });
+  }
+
+  console.log('Seeded ResolveX prototype users, transactions, and policy requirements.');
+  console.log('Development-only fallback password is ResolveXDemo123! when no RESOLVEX_DEMO_* password is set.');
 }
 
 main()

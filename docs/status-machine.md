@@ -11,6 +11,11 @@
 - `APPEALED`
 - `CLOSED`
 
+## Merchant Response Statuses
+- `PENDING`
+- `SUBMITTED`
+- `REOPENED`
+
 ## Transition Rules
 | From | To | Trigger Role | Reason |
 | --- | --- | --- | --- |
@@ -33,3 +38,6 @@
 - `RESOLVED` requires deterministic policy output and structured evidence references.
 - Low-confidence or conflicting evidence must transition to `HUMAN_REVIEW`.
 - `CLOSED` is terminal.
+- Merchant responses can move a case from `AWAITING_MERCHANT` to `EVIDENCE_PROCESSING` only after a valid structured response.
+- Duplicate final merchant responses are blocked once `merchantResponseStatus` is `SUBMITTED`.
+- Merchant responses after `responseDeadline` are blocked unless an analyst workflow has reopened the merchant response window with `merchantResponseStatus` set to `REOPENED`.

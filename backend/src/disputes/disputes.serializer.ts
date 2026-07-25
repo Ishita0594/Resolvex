@@ -13,6 +13,8 @@ export type DisputeCaseResponse = {
   reasonCode: string;
   cardMemberStatement: string;
   merchantStatement: string | null;
+  merchantResponseDate: string | null;
+  merchantResponseStatus: string;
   status: string;
   responseDeadline: string;
   createdAt: string;
@@ -40,6 +42,8 @@ export function serializeDisputeCase(disputeCase: DisputeCaseWithTransaction): D
     reasonCode: disputeCase.reasonCode,
     cardMemberStatement: disputeCase.cardMemberStatement,
     merchantStatement: disputeCase.merchantStatement,
+    merchantResponseDate: disputeCase.merchantResponseDate?.toISOString() ?? null,
+    merchantResponseStatus: disputeCase.merchantResponseStatus,
     status: disputeCase.status,
     responseDeadline: disputeCase.responseDeadline.toISOString(),
     createdAt: disputeCase.createdAt.toISOString(),

@@ -31,19 +31,34 @@ enum CaseStatus {
   CLOSED
 }
 
+enum MerchantResponseStatus {
+  PENDING
+  SUBMITTED
+  REOPENED
+}
+
+enum EvidenceProcessingStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+  VERIFIED
+}
+
 model User {
-  id                         String          @id @default(uuid()) @db.Uuid
-  name                       String
-  email                      String          @unique
-  passwordHash               String
-  role                       Role
-  createdAt                  DateTime        @default(now())
-  updatedAt                  DateTime        @updatedAt
-  cardMemberTransactions     Transaction[]   @relation("CardMemberTransactions")
-  merchantTransactions       Transaction[]   @relation("MerchantTransactions")
-  cardMemberDisputeCases     DisputeCase[]   @relation("CardMemberDisputeCases")
-  merchantDisputeCases       DisputeCase[]   @relation("MerchantDisputeCases")
-  performedTimelineEvents    TimelineEvent[] @relation("PerformedTimelineEvents")
+  id                      String          @id @default(uuid()) @db.Uuid
+  name                    String
+  email                   String          @unique
+  passwordHash            String
+  role                    Role
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  cardMemberTransactions  Transaction[]   @relation("CardMemberTransactions")
+  merchantTransactions    Transaction[]   @relation("MerchantTransactions")
+  cardMemberDisputeCases  DisputeCase[]   @relation("CardMemberDisputeCases")
+  merchantDisputeCases    DisputeCase[]   @relation("MerchantDisputeCases")
+  submittedEvidence       EvidenceItem[]  @relation("SubmittedEvidence")
+  performedTimelineEvents TimelineEvent[] @relation("PerformedTimelineEvents")
 }
 
 model Transaction {
@@ -67,27 +82,90 @@ model Transaction {
 }
 
 model DisputeCase {
-  id                  String          @id @default(uuid()) @db.Uuid
-  transactionId       String          @db.Uuid
-  cardMemberId        String          @db.Uuid
-  merchantId          String          @db.Uuid
-  reasonCode          ReasonCode
-  cardMemberStatement String
-  merchantStatement   String?
-  status              CaseStatus
-  responseDeadline    DateTime
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  resolvedAt          DateTime?
-  transaction         Transaction     @relation(fields: [transactionId], references: [id])
-  cardMember          User            @relation("CardMemberDisputeCases", fields: [cardMemberId], references: [id])
-  merchant            User            @relation("MerchantDisputeCases", fields: [merchantId], references: [id])
-  timelineEvents      TimelineEvent[]
+  id                     String                 @id @default(uuid()) @db.Uuid
+  transactionId          String                 @db.Uuid
+  cardMemberId           String                 @db.Uuid
+  merchantId             String                 @db.Uuid
+  reasonCode             ReasonCode
+  cardMemberStatement    String
+  merchantStatement      String?
+  merchantResponseDate   DateTime?
+  merchantResponseStatus MerchantResponseStatus @default(PENDING)
+  status                 CaseStatus
+  responseDeadline       DateTime
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  resolvedAt             DateTime?
+  transaction            Transaction            @relation(fields: [transactionId], references: [id])
+  cardMember             User                   @relation("CardMemberDisputeCases", fields: [cardMemberId], references: [id])
+  merchant               User                   @relation("MerchantDisputeCases", fields: [merchantId], references: [id])
+  evidenceItems          EvidenceItem[]
+  timelineEvents         TimelineEvent[]
 
   @@index([cardMemberId])
   @@index([merchantId])
   @@index([transactionId])
   @@index([status])
+}
+
+model PolicyRequirement {
+  id                    String     @id @default(uuid()) @db.Uuid
+  reasonCode            ReasonCode
+  requirementKey        String
+  requirementName       String
+  description           String
+  acceptedEvidenceTypes Json
+  weight                Int
+  isMandatory           Boolean
+  policyVersion         String
+  active                Boolean    @default(true)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@unique([reasonCode, requirementKey, policyVersion])
+  @@index([reasonCode, active])
+}
+
+model EvidenceItem {
+  id                   String                   @id @default(uuid()) @db.Uuid
+  caseId               String                   @db.Uuid
+  submittedByUserId    String                   @db.Uuid
+  submittedByRole      Role
+  evidenceType         String
+  fileName             String
+  mimeType             String
+  sizeBytes            Int
+  storageKey           String                   @unique
+  fileHash             String?
+  processingStatus     EvidenceProcessingStatus @default(UPLOADED)
+  extractionConfidence Float?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  case                 DisputeCase              @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  submittedBy          User                     @relation("SubmittedEvidence", fields: [submittedByUserId], references: [id])
+  extractedFacts       ExtractedFact[]
+
+  @@index([caseId])
+  @@index([submittedByUserId])
+  @@index([processingStatus])
+}
+
+model ExtractedFact {
+  id              String       @id @default(uuid()) @db.Uuid
+  evidenceId      String       @db.Uuid
+  factType        String
+  factValue       String
+  normalizedValue String?
+  confidence      Float?
+  sourcePage      Int?
+  verifiedByUser  Boolean      @default(false)
+  correctedByUser Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  evidence        EvidenceItem @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@index([evidenceId])
+  @@index([factType])
 }
 
 model TimelineEvent {

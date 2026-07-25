@@ -7,6 +7,17 @@ export interface ValidatedEnvironment {
   JWT_SECRET: string;
   JWT_EXPIRES_IN: string;
   DISPUTE_MERCHANT_RESPONSE_DAYS: number;
+  STORAGE_PROVIDER: 'local' | 's3';
+  LOCAL_STORAGE_PATH: string;
+  MAX_EVIDENCE_FILE_SIZE_BYTES: number;
+  EVIDENCE_UPLOAD_URL_TTL_SECONDS: number;
+  EVIDENCE_DOWNLOAD_URL_TTL_SECONDS: number;
+  API_PUBLIC_BASE_URL?: string;
+  AWS_REGION?: string;
+  AWS_S3_BUCKET?: string;
+  AWS_ACCESS_KEY_ID?: string;
+  AWS_SECRET_ACCESS_KEY?: string;
+  AWS_SESSION_TOKEN?: string;
 }
 
 export function validateEnv(config: Environment): ValidatedEnvironment {
@@ -31,6 +42,35 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     throw new Error('DISPUTE_MERCHANT_RESPONSE_DAYS must be a positive integer');
   }
 
+  const storageProvider = config.STORAGE_PROVIDER ?? 'local';
+  if (storageProvider !== 'local' && storageProvider !== 's3') {
+    throw new Error('STORAGE_PROVIDER must be either local or s3');
+  }
+
+  const maxEvidenceFileSizeBytes = Number(config.MAX_EVIDENCE_FILE_SIZE_BYTES ?? 10 * 1024 * 1024);
+  if (!Number.isInteger(maxEvidenceFileSizeBytes) || maxEvidenceFileSizeBytes <= 0) {
+    throw new Error('MAX_EVIDENCE_FILE_SIZE_BYTES must be a positive integer');
+  }
+
+  const evidenceUploadUrlTtlSeconds = Number(config.EVIDENCE_UPLOAD_URL_TTL_SECONDS ?? 600);
+  if (!Number.isInteger(evidenceUploadUrlTtlSeconds) || evidenceUploadUrlTtlSeconds <= 0) {
+    throw new Error('EVIDENCE_UPLOAD_URL_TTL_SECONDS must be a positive integer');
+  }
+
+  const evidenceDownloadUrlTtlSeconds = Number(config.EVIDENCE_DOWNLOAD_URL_TTL_SECONDS ?? 300);
+  if (!Number.isInteger(evidenceDownloadUrlTtlSeconds) || evidenceDownloadUrlTtlSeconds <= 0) {
+    throw new Error('EVIDENCE_DOWNLOAD_URL_TTL_SECONDS must be a positive integer');
+  }
+
+  if (storageProvider === 's3') {
+    const requiredS3Keys = ['AWS_REGION', 'AWS_S3_BUCKET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
+    const missingS3Keys = requiredS3Keys.filter((key) => !config[key]);
+
+    if (missingS3Keys.length > 0) {
+      throw new Error(`Missing required S3 storage environment variables: ${missingS3Keys.join(', ')}`);
+    }
+  }
+
   return {
     NODE_ENV: config.NODE_ENV ?? 'development',
     PORT: port,
@@ -38,5 +78,16 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     JWT_SECRET: config.JWT_SECRET as string,
     JWT_EXPIRES_IN: config.JWT_EXPIRES_IN ?? '1h',
     DISPUTE_MERCHANT_RESPONSE_DAYS: disputeMerchantResponseDays,
+    STORAGE_PROVIDER: storageProvider,
+    LOCAL_STORAGE_PATH: config.LOCAL_STORAGE_PATH ?? './storage/evidence',
+    MAX_EVIDENCE_FILE_SIZE_BYTES: maxEvidenceFileSizeBytes,
+    EVIDENCE_UPLOAD_URL_TTL_SECONDS: evidenceUploadUrlTtlSeconds,
+    EVIDENCE_DOWNLOAD_URL_TTL_SECONDS: evidenceDownloadUrlTtlSeconds,
+    API_PUBLIC_BASE_URL: config.API_PUBLIC_BASE_URL,
+    AWS_REGION: config.AWS_REGION,
+    AWS_S3_BUCKET: config.AWS_S3_BUCKET,
+    AWS_ACCESS_KEY_ID: config.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: config.AWS_SECRET_ACCESS_KEY,
+    AWS_SESSION_TOKEN: config.AWS_SESSION_TOKEN,
   };
 }
