@@ -15,7 +15,8 @@ const NAV_ITEMS_BY_ROLE: Record<UserRole, NavItem[]> = {
     { to: '/member/disputes', label: 'My Disputes', icon: 'bi-clipboard-data' },
   ],
   MERCHANT: [
-    { to: '/merchant/dashboard', label: 'Disputes', icon: 'bi-shop' },
+    { to: '/merchant/dashboard', label: 'Dashboard', icon: 'bi-shop' },
+    { to: '/merchant/disputes', label: 'Assigned Cases', icon: 'bi-clipboard-data' },
   ],
   ANALYST: [
     { to: '/analyst/dashboard', label: 'Review Queue', icon: 'bi-clipboard-check' },

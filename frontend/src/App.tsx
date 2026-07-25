@@ -12,6 +12,8 @@ import { CreateDisputePage } from './pages/member/CreateDisputePage';
 import { MemberCasesPage } from './pages/member/MemberCasesPage';
 import { CaseDetailsPage } from './pages/member/CaseDetailsPage';
 import { MerchantDashboard } from './pages/merchant/MerchantDashboard';
+import { MerchantCasesPage } from './pages/merchant/MerchantCasesPage';
+import { MerchantCaseDetailsPage } from './pages/merchant/MerchantCaseDetailsPage';
 import { AnalystDashboard } from './pages/analyst/AnalystDashboard';
 import { NotFoundPage } from './pages/misc/NotFoundPage';
 import { UnauthorizedPage } from './pages/misc/UnauthorizedPage';
@@ -50,6 +52,8 @@ function AppRoutes() {
           </Route>
           <Route element={<RoleRoute allow={['MERCHANT']} />}>
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
+            <Route path="/merchant/disputes" element={<MerchantCasesPage />} />
+            <Route path="/merchant/disputes/:caseId" element={<MerchantCaseDetailsPage />} />
           </Route>
           <Route element={<RoleRoute allow={['ANALYST']} />}>
             <Route path="/analyst/dashboard" element={<AnalystDashboard />} />

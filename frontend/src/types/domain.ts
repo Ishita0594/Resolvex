@@ -214,3 +214,9 @@ export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   APPEALED: 'Appealed',
   CLOSED: 'Closed',
 };
+
+export const MERCHANT_RESPONSE_STATUS_LABELS: Record<MerchantResponseStatus, string> = {
+  PENDING: 'Response pending',
+  SUBMITTED: 'Response submitted',
+  REOPENED: 'Reopened for response',
+};
