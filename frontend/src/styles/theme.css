@@ -1,0 +1,326 @@
+:root {
+  --rx-navy-950: #050e24;
+  --rx-navy-900: #0a1f44;
+  --rx-navy-800: #122a5c;
+  --rx-navy-700: #1a3a7a;
+  --rx-blue-600: #006fcf;
+  --rx-blue-500: #1f7fe0;
+  --rx-blue-100: #e5f1fd;
+  --rx-gold-500: #c9a227;
+  --rx-gold-400: #ddbb54;
+
+  --rx-white: #ffffff;
+  --rx-gray-50: #f6f8fc;
+  --rx-gray-100: #eef1f7;
+  --rx-gray-200: #e1e6ef;
+  --rx-gray-300: #cbd3e1;
+  --rx-gray-500: #6b7690;
+  --rx-gray-600: #4c5670;
+  --rx-gray-700: #363f57;
+  --rx-gray-900: #131a2c;
+
+  --rx-status-submitted: #006fcf;
+  --rx-status-processing: #e0a319;
+  --rx-status-review: #e0721f;
+  --rx-status-resolved: #1e8e5a;
+  --rx-status-failed: #d64545;
+  --rx-status-neutral: #6b7690;
+
+  --rx-radius-sm: 8px;
+  --rx-radius-md: 12px;
+  --rx-radius-lg: 20px;
+
+  --rx-shadow-sm: 0 1px 2px rgba(10, 31, 68, 0.06), 0 1px 1px rgba(10, 31, 68, 0.04);
+  --rx-shadow-md: 0 8px 24px rgba(10, 31, 68, 0.08), 0 2px 6px rgba(10, 31, 68, 0.06);
+  --rx-shadow-lg: 0 20px 48px rgba(10, 31, 68, 0.16);
+
+  --rx-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --bs-body-font-family: var(--rx-font-sans);
+  --bs-primary: var(--rx-blue-600);
+  --bs-primary-rgb: 0, 111, 207;
+  --bs-body-bg: var(--rx-gray-50);
+  --bs-body-color: var(--rx-gray-900);
+  --bs-border-radius: var(--rx-radius-sm);
+  --bs-border-radius-lg: var(--rx-radius-md);
+}
+
+body {
+  background: var(--rx-gray-50);
+  color: var(--rx-gray-900);
+  font-family: var(--rx-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.rx-app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* -------------------------------------------------- */
+/* Buttons                                             */
+/* -------------------------------------------------- */
+
+.btn-primary {
+  --bs-btn-bg: var(--rx-blue-600);
+  --bs-btn-border-color: var(--rx-blue-600);
+  --bs-btn-hover-bg: #0058a3;
+  --bs-btn-hover-border-color: #0058a3;
+  --bs-btn-active-bg: #004b8c;
+  --bs-btn-active-border-color: #004b8c;
+  --bs-btn-focus-shadow-rgb: 0, 111, 207;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: var(--rx-blue-600);
+  --bs-btn-border-color: var(--rx-blue-600);
+  --bs-btn-hover-bg: var(--rx-blue-600);
+  --bs-btn-hover-border-color: var(--rx-blue-600);
+  font-weight: 600;
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, var(--rx-gold-400), var(--rx-gold-500));
+  border: none;
+  color: var(--rx-navy-950);
+  font-weight: 700;
+}
+
+.btn-gold:hover {
+  filter: brightness(1.05);
+  color: var(--rx-navy-950);
+}
+
+/* -------------------------------------------------- */
+/* Cards                                               */
+/* -------------------------------------------------- */
+
+.rx-card {
+  background: var(--rx-white);
+  border: 1px solid var(--rx-gray-200);
+  border-radius: var(--rx-radius-md);
+  box-shadow: var(--rx-shadow-sm);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.rx-card--interactive:hover {
+  box-shadow: var(--rx-shadow-md);
+  transform: translateY(-2px);
+}
+
+/* -------------------------------------------------- */
+/* Status badges                                       */
+/* -------------------------------------------------- */
+
+.rx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rx-badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.rx-badge--submitted { background: var(--rx-blue-100); color: var(--rx-status-submitted); }
+.rx-badge--processing { background: #fdf2df; color: var(--rx-status-processing); }
+.rx-badge--review { background: #fdead9; color: var(--rx-status-review); }
+.rx-badge--resolved { background: #e2f6ec; color: var(--rx-status-resolved); }
+.rx-badge--failed { background: #fbe4e4; color: var(--rx-status-failed); }
+.rx-badge--neutral { background: var(--rx-gray-100); color: var(--rx-status-neutral); }
+
+/* -------------------------------------------------- */
+/* Auth split layout                                   */
+/* -------------------------------------------------- */
+
+.rx-auth-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.rx-auth-brand {
+  flex: 1 1 44%;
+  position: relative;
+  background: radial-gradient(120% 120% at 15% 10%, var(--rx-navy-700) 0%, var(--rx-navy-900) 45%, var(--rx-navy-950) 100%);
+  color: var(--rx-white);
+  padding: clamp(2rem, 5vw, 4.5rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.rx-auth-brand::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(135deg, rgba(201, 162, 39, 0.14) 0%, transparent 45%),
+    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 64px);
+  pointer-events: none;
+}
+
+.rx-auth-form {
+  flex: 1 1 56%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  background: var(--rx-white);
+}
+
+.rx-auth-form-inner {
+  width: 100%;
+  max-width: 420px;
+}
+
+.rx-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: 0.01em;
+}
+
+.rx-brand-mark-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--rx-blue-500), var(--rx-blue-600));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  box-shadow: 0 4px 14px rgba(0, 111, 207, 0.45);
+}
+
+.rx-auth-quote {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  line-height: 1.35;
+  font-weight: 600;
+  max-width: 30rem;
+}
+
+.rx-auth-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: clamp(1.5rem, 4vw, 3rem);
+}
+
+.rx-auth-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--rx-gold-400);
+}
+
+.rx-auth-stat-label {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* -------------------------------------------------- */
+/* App shell layout                                    */
+/* -------------------------------------------------- */
+
+.rx-topbar {
+  background: var(--rx-navy-900);
+  color: var(--rx-white);
+  padding: 0.65rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 12px rgba(10, 31, 68, 0.18);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.rx-role-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.rx-sidebar {
+  background: var(--rx-white);
+  border-right: 1px solid var(--rx-gray-200);
+  min-height: calc(100vh - 56px);
+  padding: 1.25rem 0.85rem;
+}
+
+.rx-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.85rem;
+  border-radius: var(--rx-radius-sm);
+  color: var(--rx-gray-700);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.rx-nav-link:hover {
+  background: var(--rx-gray-100);
+  color: var(--rx-navy-900);
+}
+
+.rx-nav-link.active {
+  background: var(--rx-blue-100);
+  color: var(--rx-blue-600);
+}
+
+.rx-main {
+  flex: 1;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+/* -------------------------------------------------- */
+/* Confidence indicator                                 */
+/* -------------------------------------------------- */
+
+.rx-confidence-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--rx-gray-200);
+  overflow: hidden;
+}
+
+.rx-confidence-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.rx-confidence-fill--high { background: var(--rx-status-resolved); }
+.rx-confidence-fill--medium { background: var(--rx-status-processing); }
+.rx-confidence-fill--low { background: var(--rx-status-failed); }
