@@ -146,6 +146,15 @@ export interface EvidenceItem {
   facts: ExtractedFact[];
 }
 
+export interface EvidenceUploadTarget {
+  evidenceId: string;
+  uploadUrl: string;
+  method: 'POST' | 'PUT';
+  headers: Record<string, string>;
+  fields?: Record<string, string>;
+  expiresAt: string;
+}
+
 export interface DecisionRecord {
   id: string;
   caseId: string;
@@ -219,4 +228,12 @@ export const MERCHANT_RESPONSE_STATUS_LABELS: Record<MerchantResponseStatus, str
   PENDING: 'Response pending',
   SUBMITTED: 'Response submitted',
   REOPENED: 'Reopened for response',
+};
+
+export const EVIDENCE_PROCESSING_STATUS_LABELS: Record<EvidenceProcessingStatus, string> = {
+  UPLOADED: 'Uploaded',
+  PROCESSING: 'Processing',
+  PROCESSED: 'Processed',
+  FAILED: 'Failed',
+  VERIFIED: 'Verified',
 };

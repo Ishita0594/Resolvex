@@ -4,8 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MerchantCaseDetailsPage } from './MerchantCaseDetailsPage';
 import * as merchantApi from '../../api/merchant';
+import * as evidenceApi from '../../api/evidence';
+import * as authApi from '../../api/auth';
+import { AuthProvider } from '../../auth/AuthContext';
 import { ApiError } from '../../api/client';
 import type { DisputeCase, PolicyRequirement } from '../../types/domain';
+
+const MERCHANT_USER = { id: 'merchant-1', name: 'Northstar Electronics', email: 'merchant@resolvex.demo', role: 'MERCHANT' as const };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const FUTURE_DEADLINE = new Date(Date.now() + 10 * DAY_MS).toISOString();
@@ -72,10 +77,12 @@ function buildDispute(overrides: Partial<DisputeCase> = {}): DisputeCase {
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/merchant/disputes/case-1']}>
-      <Routes>
-        <Route path="/merchant/disputes/:caseId" element={<MerchantCaseDetailsPage />} />
-        <Route path="/merchant/disputes" element={<div>Cases list page</div>} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/merchant/disputes/:caseId" element={<MerchantCaseDetailsPage />} />
+          <Route path="/merchant/disputes" element={<div>Cases list page</div>} />
+        </Routes>
+      </AuthProvider>
     </MemoryRouter>,
   );
 }
@@ -90,8 +97,12 @@ async function fillMandatoryEvidence(user: ReturnType<typeof userEvent.setup>) {
 
 describe('MerchantCaseDetailsPage', () => {
   beforeEach(() => {
+    window.localStorage.clear();
     vi.restoreAllMocks();
+    vi.spyOn(authApi, 'fetchProfile').mockResolvedValue(MERCHANT_USER);
+    window.localStorage.setItem('resolvex.accessToken', 'test-token');
     vi.spyOn(merchantApi, 'getPolicyRequirements').mockResolvedValue(REQUIREMENTS);
+    vi.spyOn(evidenceApi, 'listCaseEvidence').mockResolvedValue([]);
   });
 
   it('renders transaction details, card-member statement, and the checklist from the API', async () => {

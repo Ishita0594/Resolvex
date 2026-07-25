@@ -1,5 +1,5 @@
 import type { CaseStatus, EvidenceProcessingStatus } from '../../types/domain';
-import { CASE_STATUS_LABELS } from '../../types/domain';
+import { CASE_STATUS_LABELS, EVIDENCE_PROCESSING_STATUS_LABELS } from '../../types/domain';
 import { humanizeLabel } from '../../utils/format';
 
 type Tone = 'submitted' | 'processing' | 'review' | 'resolved' | 'failed' | 'neutral';
@@ -36,7 +36,7 @@ export function CaseStatusBadge({ status }: { status: CaseStatus }) {
 }
 
 export function EvidenceStatusBadge({ status }: { status: EvidenceProcessingStatus }) {
-  return <span className={`rx-badge rx-badge--${EVIDENCE_STATUS_TONE[status]}`}>{status.charAt(0) + status.slice(1).toLowerCase()}</span>;
+  return <span className={`rx-badge rx-badge--${EVIDENCE_STATUS_TONE[status]}`}>{EVIDENCE_PROCESSING_STATUS_LABELS[status]}</span>;
 }
 
 export function TransactionStatusBadge({ status }: { status: string }) {

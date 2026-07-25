@@ -26,3 +26,18 @@ export function humanizeLabel(value: string): string {
 export function toDateInputValue(isoDate: string): string {
   return isoDate.slice(0, 10);
 }
+
+const FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB'];
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < FILE_SIZE_UNITS.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${FILE_SIZE_UNITS[unitIndex]}`;
+}

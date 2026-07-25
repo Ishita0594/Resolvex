@@ -1,28 +1,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getMerchantDispute, getPolicyRequirements, submitMerchantResponse } from '../../api/merchant';
+import { listCaseEvidence } from '../../api/evidence';
 import { ApiError } from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
 import { CaseStatusBadge } from '../../components/common/StatusBadge';
 import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 import { DeadlineBadge } from '../../components/common/DeadlineBadge';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { PolicyChecklist, type PolicyChecklistEntry } from '../../components/merchant/PolicyChecklist';
+import { EvidenceList } from '../../components/evidence/EvidenceList';
+import { EvidenceUploader } from '../../components/evidence/EvidenceUploader';
+import type { EvidenceTypeOption } from '../../constants/evidenceTypes';
 import { resolveApiError } from '../../utils/apiError';
-import { formatDate } from '../../utils/format';
+import { formatDate, humanizeLabel } from '../../utils/format';
 import { canSubmitMerchantResponse, isDeadlineExpired } from '../../utils/merchantCase';
-import type { DisputeCase, PolicyRequirement } from '../../types/domain';
+import type { DisputeCase, EvidenceItem, PolicyRequirement } from '../../types/domain';
 import { REASON_CODE_LABELS } from '../../types/domain';
 
 const STATEMENT_MIN_LENGTH = 10;
 
 export function MerchantCaseDetailsPage() {
   const { caseId } = useParams<{ caseId: string }>();
+  const { user } = useAuth();
 
   const [dispute, setDispute] = useState<DisputeCase | null>(null);
   const [requirements, setRequirements] = useState<PolicyRequirement[] | null>(null);
   const [loadError, setLoadError] = useState<{ message: string; variant: ErrorStateVariant } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+  const [isEvidenceLoading, setIsEvidenceLoading] = useState(true);
+  const [evidenceError, setEvidenceError] = useState<{ message: string; variant: ErrorStateVariant } | null>(null);
 
   const [statement, setStatement] = useState('');
   const [evidenceState, setEvidenceState] = useState<Record<string, PolicyChecklistEntry>>({});
@@ -49,10 +59,37 @@ export function MerchantCaseDetailsPage() {
       .finally(() => setIsLoading(false));
   }
 
+  function loadEvidence() {
+    if (!caseId) {
+      return;
+    }
+    setIsEvidenceLoading(true);
+    setEvidenceError(null);
+    listCaseEvidence(caseId)
+      .then(setEvidence)
+      .catch((err) => {
+        setEvidenceError(resolveApiError(err, 'Unable to load evidence for this case right now.'));
+      })
+      .finally(() => setIsEvidenceLoading(false));
+  }
+
   useEffect(() => {
     loadCase();
+    loadEvidence();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseId]);
+
+  const evidenceTypeOptions = useMemo<EvidenceTypeOption[]>(() => {
+    const seen = new Map<string, EvidenceTypeOption>();
+    (requirements ?? []).forEach((requirement) => {
+      requirement.acceptedEvidenceTypes.forEach((type) => {
+        if (!seen.has(type)) {
+          seen.set(type, { value: type, label: humanizeLabel(type) });
+        }
+      });
+    });
+    return Array.from(seen.values());
+  }, [requirements]);
 
   const alreadySubmitted = dispute?.merchantResponseStatus === 'SUBMITTED';
   const canRespond = dispute ? canSubmitMerchantResponse(dispute) : false;
@@ -258,14 +295,34 @@ export function MerchantCaseDetailsPage() {
         </div>
 
         <div className="col-lg-5">
-          <div className="rx-card p-4 rx-card--placeholder">
-            <h2 className="h6 text-uppercase text-muted mb-2" style={{ letterSpacing: '0.06em' }}>
+          <div className="rx-card p-4 mb-4">
+            <h2 className="h6 text-uppercase text-muted mb-3" style={{ letterSpacing: '0.06em' }}>
               Evidence attachments
             </h2>
-            <p className="text-muted mb-0 small">
-              File uploads for supporting evidence will be available in a later phase. For now, reference evidence details
-              directly in the checklist above.
-            </p>
+            {user ? (
+              <EvidenceUploader caseId={dispute.id} evidenceTypeOptions={evidenceTypeOptions} onUploaded={loadEvidence} />
+            ) : null}
+            <div className="mt-4">
+              {user ? (
+                <EvidenceList
+                  evidence={evidence}
+                  isLoading={isEvidenceLoading}
+                  error={evidenceError}
+                  onRetryLoad={loadEvidence}
+                  currentUserId={user.id}
+                  currentUserRole={user.role}
+                  caseStatus={dispute.status}
+                  onDeleted={(evidenceId) => setEvidence((current) => current.filter((item) => item.id !== evidenceId))}
+                />
+              ) : null}
+            </div>
+          </div>
+
+          <div className="rx-card p-4 rx-card--placeholder">
+            <h2 className="h6 text-uppercase text-muted mb-2" style={{ letterSpacing: '0.06em' }}>
+              Extracted facts
+            </h2>
+            <p className="text-muted mb-0 small">AI-extracted facts from submitted evidence will be available for review in a later phase.</p>
           </div>
         </div>
       </div>
