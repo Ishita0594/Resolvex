@@ -26,7 +26,7 @@ This file documents the API surface for ResolveX. Phase 4 implements authenticat
 - `Merchant Disputes`: merchant-assigned dispute list and detail reads
 - `Policy Requirements`: reason-specific prototype merchant evidence checklists loaded from PostgreSQL
 - `Merchant Responses`: structured merchant response submission
-- `Evidence`: upload target creation, local multipart upload support, confirmation, metadata reads, temporary downloads, extracted fact updates, and deletion
+- `Evidence`: upload target creation, local multipart upload support, confirmation, metadata reads, temporary downloads, AI processing, extracted fact reads and updates, retry, and deletion
 
 ## Planned Resources
 - `Policy Evaluation`: deterministic rule evaluation and explanation
@@ -439,7 +439,7 @@ Response:
 ```
 
 ### `PATCH /api/evidence/:evidenceId/facts`
-Replaces extracted facts for one evidence item. The submitting party can update its own evidence facts; analysts may update facts during review workflows.
+Replaces extracted facts for one evidence item. The submitting party can correct its own evidence facts and mark them verified; analysts may update facts during review workflows.
 
 Request:
 ```json
@@ -460,3 +460,66 @@ Request:
 
 ### `DELETE /api/evidence/:evidenceId`
 Deletes an evidence metadata row and underlying storage object when the user owns the evidence and the case status still allows evidence changes. Successful deletion returns `204`.
+
+### `POST /api/evidence/:evidenceId/process`
+Processes uploaded evidence through the AI service.
+
+Rules:
+- The submitting user or an analyst may request processing.
+- The backend marks the item `PROCESSING` before calling the AI service.
+- Stored evidence bytes are sent server-side; internal storage keys are not exposed.
+- AI responses are schema-validated before database writes.
+- AI output creates reviewable facts only. It does not decide the dispute outcome.
+- Successful processing stores extracted facts, stores aggregate extraction confidence, marks evidence `PROCESSED`, and creates an `EVIDENCE_PROCESSED` timeline event.
+- Failed processing marks evidence `FAILED` and creates an `EVIDENCE_PROCESSING_FAILED` timeline event.
+
+### `POST /api/evidence/:evidenceId/retry`
+Retries evidence processing only when the current evidence status is `FAILED`. Successful retry marks evidence `PROCESSED`; failed retry returns `FAILED` again with a retry failure timeline event.
+
+### `GET /api/evidence/:evidenceId/facts`
+Returns extracted facts for a visible evidence item.
+
+Response:
+```json
+[
+  {
+    "id": "uuid",
+    "evidenceId": "uuid",
+    "factType": "ORDER_ID",
+    "factValue": "ORD-10045",
+    "normalizedValue": "ORD-10045",
+    "confidence": 0.9,
+    "sourcePage": null,
+    "verifiedByUser": false,
+    "correctedByUser": false,
+    "createdAt": "2026-07-25T10:01:00.000Z",
+    "updatedAt": "2026-07-25T10:01:00.000Z"
+  }
+]
+```
+
+## AI Service Endpoints
+The AI service is a separate FastAPI process. It extracts and classifies reviewable evidence facts only.
+
+### `GET /health`
+Returns service status and provider metadata.
+
+### `POST /parse-document`
+Accepts `multipart/form-data` with either a file field named `file` or text field `document_text`.
+
+Response includes:
+- `extracted_text`
+- `structured_facts`
+- `document_classification`
+- `warnings`
+- `provider_metadata`
+- `summary`
+
+### `POST /classify-evidence`
+Classifies document text using deterministic keywords and optional Hugging Face support analysis.
+
+### `POST /detect-contradictions`
+Returns candidate contradictions across supplied texts. These are review signals only, not outcomes.
+
+### `POST /summarize-evidence`
+Returns a short evidence summary for analyst review.

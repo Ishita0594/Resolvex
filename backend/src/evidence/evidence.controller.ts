@@ -37,6 +37,7 @@ import { UserRole } from '../users/user-role.enum';
 import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 import { CreateUploadTargetDto } from './dto/create-upload-target.dto';
 import { UpdateFactsDto } from './dto/update-facts.dto';
+import { AiProcessingService } from './ai-processing.service';
 import { EvidenceService } from './evidence.service';
 
 type UploadedEvidenceFile = {
@@ -89,7 +90,10 @@ export class CaseEvidenceController {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('evidence')
 export class EvidenceController {
-  constructor(private readonly evidenceService: EvidenceService) {}
+  constructor(
+    private readonly evidenceService: EvidenceService,
+    private readonly aiProcessingService: AiProcessingService,
+  ) {}
 
   @Get(':evidenceId')
   @Roles(UserRole.CARD_MEMBER, UserRole.MERCHANT, UserRole.ANALYST)
@@ -110,6 +114,33 @@ export class EvidenceController {
     @CurrentUser() user: PublicUser,
   ) {
     return this.evidenceService.createTemporaryDownload(evidenceId, user);
+  }
+
+  @Post(':evidenceId/process')
+  @Roles(UserRole.CARD_MEMBER, UserRole.MERCHANT, UserRole.ANALYST)
+  @ApiOperation({ summary: 'Process uploaded evidence into structured facts' })
+  processEvidence(
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @CurrentUser() user: PublicUser,
+  ) {
+    return this.aiProcessingService.processEvidence(evidenceId, user);
+  }
+
+  @Post(':evidenceId/retry')
+  @Roles(UserRole.CARD_MEMBER, UserRole.MERCHANT, UserRole.ANALYST)
+  @ApiOperation({ summary: 'Retry failed evidence processing' })
+  retryProcessing(
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @CurrentUser() user: PublicUser,
+  ) {
+    return this.aiProcessingService.processEvidence(evidenceId, user, true);
+  }
+
+  @Get(':evidenceId/facts')
+  @Roles(UserRole.CARD_MEMBER, UserRole.MERCHANT, UserRole.ANALYST)
+  @ApiOperation({ summary: 'List extracted facts for one evidence item' })
+  listFacts(@Param('evidenceId', ParseUUIDPipe) evidenceId: string, @CurrentUser() user: PublicUser) {
+    return this.aiProcessingService.listFacts(evidenceId, user);
   }
 
   @Patch(':evidenceId/facts')

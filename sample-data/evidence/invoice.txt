@@ -1,0 +1,6 @@
+Invoice INV-2026-001
+Merchant: Northstar Electronics
+Order ID: ORD-10045
+Invoice Date: July 2, 2026
+Transaction Amount: $249.99
+Status: paid

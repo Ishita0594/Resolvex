@@ -142,4 +142,4 @@ Case and resolution records must preserve:
 - Timestamp
 - Human review reason when applicable
 
-Phase 2 records initial status transitions through `TimelineEvent` entries when a card member creates a dispute. Phase 3 records `MERCHANT_RESPONSE_SUBMITTED` and `CASE_STATUS_CHANGED` timeline events when a merchant submits a valid structured response. Phase 4 records `EVIDENCE_UPLOAD_TARGET_CREATED`, `EVIDENCE_UPLOADED`, and `EVIDENCE_DELETED` timeline events for evidence auditability.
+Phase 2 records initial status transitions through `TimelineEvent` entries when a card member creates a dispute. Phase 3 records `MERCHANT_RESPONSE_SUBMITTED` and `CASE_STATUS_CHANGED` timeline events when a merchant submits a valid structured response. Phase 4 records `EVIDENCE_UPLOAD_TARGET_CREATED`, `EVIDENCE_UPLOADED`, and `EVIDENCE_DELETED` timeline events for evidence auditability. Phase 5 records `EVIDENCE_PROCESSED`, `EVIDENCE_PROCESSING_FAILED`, `EVIDENCE_PROCESSING_RETRIED`, and `EVIDENCE_PROCESSING_RETRY_FAILED` events for AI extraction attempts.

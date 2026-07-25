@@ -16,6 +16,13 @@
 - `SUBMITTED`
 - `REOPENED`
 
+## Evidence Processing Statuses
+- `UPLOADED`
+- `PROCESSING`
+- `PROCESSED`
+- `FAILED`
+- `VERIFIED`
+
 ## Transition Rules
 | From | To | Trigger Role | Reason |
 | --- | --- | --- | --- |
@@ -41,3 +48,6 @@
 - Merchant responses can move a case from `AWAITING_MERCHANT` to `EVIDENCE_PROCESSING` only after a valid structured response.
 - Duplicate final merchant responses are blocked once `merchantResponseStatus` is `SUBMITTED`.
 - Merchant responses after `responseDeadline` are blocked unless an analyst workflow has reopened the merchant response window with `merchantResponseStatus` set to `REOPENED`.
+- AI evidence processing may move an evidence item from `UPLOADED` or `FAILED` to `PROCESSING`, then to `PROCESSED` or `FAILED`.
+- AI processing never moves a case to `RESOLVED`; it only creates reviewable `ExtractedFact` rows.
+- User-corrected or user-verified extracted facts must be preserved by later processing attempts.

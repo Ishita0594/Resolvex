@@ -1,0 +1,6 @@
+Subject: Refund processed for order ORD-10045
+Merchant: Harbor Home Goods
+Refund Amount: $89.50
+Refund Date: 2026-07-08
+Refund Reference: RFND-77881
+Your refund has been submitted to the original payment method.

@@ -18,6 +18,8 @@ export interface ValidatedEnvironment {
   AWS_ACCESS_KEY_ID?: string;
   AWS_SECRET_ACCESS_KEY?: string;
   AWS_SESSION_TOKEN?: string;
+  AI_SERVICE_URL: string;
+  AI_SERVICE_TIMEOUT_MS: number;
 }
 
 export function validateEnv(config: Environment): ValidatedEnvironment {
@@ -62,6 +64,11 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     throw new Error('EVIDENCE_DOWNLOAD_URL_TTL_SECONDS must be a positive integer');
   }
 
+  const aiServiceTimeoutMs = Number(config.AI_SERVICE_TIMEOUT_MS ?? 15000);
+  if (!Number.isInteger(aiServiceTimeoutMs) || aiServiceTimeoutMs <= 0) {
+    throw new Error('AI_SERVICE_TIMEOUT_MS must be a positive integer');
+  }
+
   if (storageProvider === 's3') {
     const requiredS3Keys = ['AWS_REGION', 'AWS_S3_BUCKET', 'AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'];
     const missingS3Keys = requiredS3Keys.filter((key) => !config[key]);
@@ -89,5 +96,7 @@ export function validateEnv(config: Environment): ValidatedEnvironment {
     AWS_ACCESS_KEY_ID: config.AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY: config.AWS_SECRET_ACCESS_KEY,
     AWS_SESSION_TOKEN: config.AWS_SESSION_TOKEN,
+    AI_SERVICE_URL: config.AI_SERVICE_URL ?? 'http://localhost:8000',
+    AI_SERVICE_TIMEOUT_MS: aiServiceTimeoutMs,
   };
 }

@@ -1,0 +1,6 @@
+Subject: Cancellation confirmation
+Order ID: CXL-44001
+Merchant: Metro Travel Desk
+Cancellation Date: July 10, 2026
+Status: cancelled
+The booked service was cancelled before the scheduled service date.

@@ -7,3 +7,5 @@ process.env.LOCAL_STORAGE_PATH = './tmp/test-evidence';
 process.env.MAX_EVIDENCE_FILE_SIZE_BYTES = '10485760';
 process.env.EVIDENCE_UPLOAD_URL_TTL_SECONDS = '600';
 process.env.EVIDENCE_DOWNLOAD_URL_TTL_SECONDS = '300';
+process.env.AI_SERVICE_URL = 'http://localhost:8000';
+process.env.AI_SERVICE_TIMEOUT_MS = '15000';
