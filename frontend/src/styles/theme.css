@@ -111,6 +111,12 @@ body {
   transform: translateY(-2px);
 }
 
+.rx-card--placeholder {
+  border-style: dashed;
+  background: var(--rx-gray-50);
+  box-shadow: none;
+}
+
 /* -------------------------------------------------- */
 /* Status badges                                       */
 /* -------------------------------------------------- */
@@ -143,6 +149,79 @@ body {
 .rx-badge--resolved { background: #e2f6ec; color: var(--rx-status-resolved); }
 .rx-badge--failed { background: #fbe4e4; color: var(--rx-status-failed); }
 .rx-badge--neutral { background: var(--rx-gray-100); color: var(--rx-status-neutral); }
+
+/* -------------------------------------------------- */
+/* Timeline                                            */
+/* -------------------------------------------------- */
+
+.rx-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rx-timeline-item {
+  position: relative;
+  display: flex;
+  gap: 0.85rem;
+  padding-bottom: 1.25rem;
+}
+
+.rx-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.rx-timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: 0;
+  width: 2px;
+  background: var(--rx-gray-200);
+}
+
+.rx-timeline-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--rx-blue-100);
+  color: var(--rx-blue-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+
+/* -------------------------------------------------- */
+/* Loading skeleton                                    */
+/* -------------------------------------------------- */
+
+.rx-skeleton-row {
+  height: 52px;
+  border-bottom: 1px solid var(--rx-gray-100);
+  background: linear-gradient(90deg, var(--rx-gray-100) 25%, var(--rx-gray-50) 37%, var(--rx-gray-100) 63%);
+  background-size: 400% 100%;
+  animation: rx-skeleton-shimmer 1.4s ease infinite;
+}
+
+.rx-skeleton-row:last-child {
+  border-bottom: none;
+}
+
+.rx-skeleton-line {
+  height: 14px;
+  border-radius: var(--rx-radius-sm);
+  background: linear-gradient(90deg, var(--rx-gray-100) 25%, var(--rx-gray-50) 37%, var(--rx-gray-100) 63%);
+  background-size: 400% 100%;
+  animation: rx-skeleton-shimmer 1.4s ease infinite;
+}
+
+@keyframes rx-skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
 
 /* -------------------------------------------------- */
 /* Auth split layout                                   */

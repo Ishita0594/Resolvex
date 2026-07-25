@@ -7,6 +7,10 @@ import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { CardMemberDashboard } from './pages/member/CardMemberDashboard';
+import { TransactionDetailsPage } from './pages/member/TransactionDetailsPage';
+import { CreateDisputePage } from './pages/member/CreateDisputePage';
+import { MemberCasesPage } from './pages/member/MemberCasesPage';
+import { CaseDetailsPage } from './pages/member/CaseDetailsPage';
 import { MerchantDashboard } from './pages/merchant/MerchantDashboard';
 import { AnalystDashboard } from './pages/analyst/AnalystDashboard';
 import { NotFoundPage } from './pages/misc/NotFoundPage';
@@ -39,6 +43,10 @@ function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route element={<RoleRoute allow={['CARD_MEMBER']} />}>
             <Route path="/member/dashboard" element={<CardMemberDashboard />} />
+            <Route path="/member/transactions/:transactionId" element={<TransactionDetailsPage />} />
+            <Route path="/member/transactions/:transactionId/dispute" element={<CreateDisputePage />} />
+            <Route path="/member/disputes" element={<MemberCasesPage />} />
+            <Route path="/member/disputes/:caseId" element={<CaseDetailsPage />} />
           </Route>
           <Route element={<RoleRoute allow={['MERCHANT']} />}>
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />

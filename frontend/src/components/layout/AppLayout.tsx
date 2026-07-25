@@ -12,6 +12,7 @@ interface NavItem {
 const NAV_ITEMS_BY_ROLE: Record<UserRole, NavItem[]> = {
   CARD_MEMBER: [
     { to: '/member/dashboard', label: 'My Transactions', icon: 'bi-credit-card-2-front' },
+    { to: '/member/disputes', label: 'My Disputes', icon: 'bi-clipboard-data' },
   ],
   MERCHANT: [
     { to: '/merchant/dashboard', label: 'Disputes', icon: 'bi-shop' },
