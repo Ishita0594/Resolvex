@@ -28,6 +28,13 @@ Use `STORAGE_PROVIDER=s3` in production-style environments and provide `AWS_REGI
 ## AI Evidence Processing
 Set `AI_SERVICE_URL` to the FastAPI AI service base URL, usually `http://localhost:8000` in development. `AI_SERVICE_TIMEOUT_MS` controls the backend request timeout when processing evidence.
 
+AI extraction can create structured facts, but it must not decide dispute outcomes.
+
+## Deterministic Policy Evaluation
+Phase 6 stores prototype `PolicyRule`, `EvidenceScore`, and `DecisionRecord` data in PostgreSQL. Analysts run `POST /api/disputes/:caseId/evaluate`; case participants can read `/evaluation`, `/evidence-matrix`, and `/explanation`.
+
+Automatic recommendations use deterministic prototype rules only. The default gate is `POLICY_AUTO_CONFIDENCE_THRESHOLD=85`, `POLICY_AUTO_DECISION_MARGIN_THRESHOLD=20`, and `POLICY_CRITICAL_FACT_CONFIDENCE_THRESHOLD=0.8`.
+
 ## Commands
 ```powershell
 npm run start:dev

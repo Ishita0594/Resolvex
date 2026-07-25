@@ -45,6 +45,24 @@ enum EvidenceProcessingStatus {
   VERIFIED
 }
 
+enum EvidenceSupportDirection {
+  SUPPORTS_CARD_MEMBER
+  SUPPORTS_MERCHANT
+  NEUTRAL
+  CONTRADICTORY
+}
+
+enum RecommendedOutcome {
+  CARD_MEMBER_SUPPORTED
+  MERCHANT_SUPPORTED
+  HUMAN_REVIEW_REQUIRED
+}
+
+enum DecisionType {
+  AUTOMATED_RECOMMENDATION
+  HUMAN_DECISION
+}
+
 model User {
   id                      String          @id @default(uuid()) @db.Uuid
   name                    String
@@ -101,6 +119,8 @@ model DisputeCase {
   merchant               User                   @relation("MerchantDisputeCases", fields: [merchantId], references: [id])
   evidenceItems          EvidenceItem[]
   timelineEvents         TimelineEvent[]
+  evidenceScores         EvidenceScore[]
+  decisionRecords        DecisionRecord[]
 
   @@index([cardMemberId])
   @@index([merchantId])
@@ -109,7 +129,7 @@ model DisputeCase {
 }
 
 model PolicyRequirement {
-  id                    String     @id @default(uuid()) @db.Uuid
+  id                    String          @id @default(uuid()) @db.Uuid
   reasonCode            ReasonCode
   requirementKey        String
   requirementName       String
@@ -118,11 +138,29 @@ model PolicyRequirement {
   weight                Int
   isMandatory           Boolean
   policyVersion         String
-  active                Boolean    @default(true)
-  createdAt             DateTime   @default(now())
-  updatedAt             DateTime   @updatedAt
+  active                Boolean         @default(true)
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  evidenceScores        EvidenceScore[]
 
   @@unique([reasonCode, requirementKey, policyVersion])
+  @@index([reasonCode, active])
+}
+
+model PolicyRule {
+  id                  String     @id @default(uuid()) @db.Uuid
+  ruleId              String
+  reasonCode          ReasonCode
+  title               String
+  description         String
+  prototypeAssumption Boolean    @default(true)
+  severity            String
+  policyVersion       String
+  active              Boolean    @default(true)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([ruleId, policyVersion])
   @@index([reasonCode, active])
 }
 
@@ -144,6 +182,7 @@ model EvidenceItem {
   case                 DisputeCase              @relation(fields: [caseId], references: [id], onDelete: Cascade)
   submittedBy          User                     @relation("SubmittedEvidence", fields: [submittedByUserId], references: [id])
   extractedFacts       ExtractedFact[]
+  evidenceScores       EvidenceScore[]
 
   @@index([caseId])
   @@index([submittedByUserId])
@@ -166,6 +205,49 @@ model ExtractedFact {
 
   @@index([evidenceId])
   @@index([factType])
+}
+
+model EvidenceScore {
+  id                String                   @id @default(uuid()) @db.Uuid
+  caseId            String                   @db.Uuid
+  evidenceId        String                   @db.Uuid
+  requirementId     String                   @db.Uuid
+  sourceReliability Int
+  directness        Int
+  completeness      Int
+  consistency       Int
+  timeliness        Int
+  finalScore        Int
+  supportDirection  EvidenceSupportDirection
+  createdAt         DateTime                 @default(now())
+  case              DisputeCase              @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  evidence          EvidenceItem             @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  requirement       PolicyRequirement        @relation(fields: [requirementId], references: [id])
+
+  @@index([caseId])
+  @@index([evidenceId])
+  @@index([requirementId])
+  @@index([supportDirection])
+}
+
+model DecisionRecord {
+  id                 String             @id @default(uuid()) @db.Uuid
+  caseId             String             @db.Uuid
+  recommendedOutcome RecommendedOutcome
+  cardMemberScore    Int
+  merchantScore      Int
+  confidence         Int
+  decisionMargin     Int
+  decisionType       DecisionType
+  policyVersion      String
+  modelMetadata      Json
+  explanationData    Json
+  createdAt          DateTime           @default(now())
+  case               DisputeCase        @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([recommendedOutcome])
+  @@index([policyVersion])
 }
 
 model TimelineEvent {
