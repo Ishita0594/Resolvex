@@ -33,6 +33,8 @@ type AnalystCaseResponse = {
   latestRecommendation: RecommendedOutcome | null;
   latestConfidence: number | null;
   latestDecisionMargin: number | null;
+  latestEscalationReason: string | null;
+  responseDeadline: string;
   createdAt: string;
 };
 
@@ -83,10 +85,30 @@ export class AnalystReviewService {
     return cases.map(serializeAnalystCase);
   }
 
-  async findOne(
-    caseId: string,
-  ): Promise<
-    AnalystCaseResponse & { latestExplanation: unknown; reviews: unknown[] }
+  async listRecentlyResolved(limit = 10): Promise<AnalystCaseResponse[]> {
+    const cases = await this.prisma.disputeCase.findMany({
+      where: { status: PrismaCaseStatus.RESOLVED },
+      include: {
+        transaction: true,
+        decisionRecords: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: { resolvedAt: 'desc' },
+      take: limit,
+    });
+
+    return cases.map(serializeAnalystCase);
+  }
+
+  async findOne(caseId: string): Promise<
+    AnalystCaseResponse & {
+      cardMemberStatement: string;
+      merchantStatement: string | null;
+      latestExplanation: unknown;
+      reviews: unknown[];
+    }
   > {
     const disputeCase = await this.prisma.disputeCase.findUnique({
       where: { id: caseId },
@@ -109,6 +131,8 @@ export class AnalystReviewService {
     const latestDecision = disputeCase.decisionRecords[0];
     return {
       ...serializeAnalystCase(disputeCase),
+      cardMemberStatement: disputeCase.cardMemberStatement,
+      merchantStatement: disputeCase.merchantStatement,
       latestExplanation: latestDecision?.explanationData ?? null,
       reviews: disputeCase.analystReviews.map((review) => ({
         id: review.id,
@@ -476,6 +500,7 @@ function serializeAnalystCase(disputeCase: {
   status: PrismaCaseStatus;
   cardMemberId: string;
   merchantId: string;
+  responseDeadline: Date;
   createdAt: Date;
   transaction: {
     merchantName: string;
@@ -486,9 +511,14 @@ function serializeAnalystCase(disputeCase: {
     recommendedOutcome: RecommendedOutcome;
     confidence: number;
     decisionMargin: number;
+    explanationData?: Prisma.JsonValue;
   }>;
 }): AnalystCaseResponse {
   const latestDecision = disputeCase.decisionRecords[0];
+  const explanation = latestDecision?.explanationData as
+    | { humanReviewReason?: string | null }
+    | null
+    | undefined;
 
   return {
     id: disputeCase.id,
@@ -502,6 +532,8 @@ function serializeAnalystCase(disputeCase: {
     latestRecommendation: latestDecision?.recommendedOutcome ?? null,
     latestConfidence: latestDecision?.confidence ?? null,
     latestDecisionMargin: latestDecision?.decisionMargin ?? null,
+    latestEscalationReason: explanation?.humanReviewReason ?? null,
+    responseDeadline: disputeCase.responseDeadline.toISOString(),
     createdAt: disputeCase.createdAt.toISOString(),
   };
 }
