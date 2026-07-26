@@ -8,7 +8,7 @@ import { caseDetailPathForRole } from '../../utils/navigation';
 
 export function NotificationDropdown() {
   const { user } = useAuth();
-  const { notifications, unreadCount, isLoading, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, isLoading, loadError, markRead, markAllRead, reload } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -79,9 +79,20 @@ export function NotificationDropdown() {
             ) : null}
           </div>
 
+          {loadError ? (
+            <div className="d-flex align-items-center justify-content-between gap-2 px-3 py-2 small text-danger" role="alert">
+              <span>{loadError}</span>
+              <button type="button" className="btn btn-link btn-sm p-0 text-danger" onClick={reload}>
+                Retry
+              </button>
+            </div>
+          ) : null}
+
           <div className="rx-notification-list">
             {isLoading ? (
-              <p className="text-muted small px-3 py-3 mb-0">Loading&hellip;</p>
+              <p className="text-muted small px-3 py-3 mb-0" role="status">
+                Loading&hellip;
+              </p>
             ) : notifications.length === 0 ? (
               <p className="text-muted small px-3 py-3 mb-0">You&apos;re all caught up.</p>
             ) : (

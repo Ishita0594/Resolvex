@@ -6,12 +6,19 @@ const STATUS_LABEL: Record<RealtimeConnectionStatus, string> = {
   closed: 'Live updates offline',
 };
 
+const STATUS_TEXT: Record<RealtimeConnectionStatus, string> = {
+  open: 'Live',
+  connecting: 'Reconnecting…',
+  closed: 'Offline',
+};
+
 export function RealtimeStatusIndicator() {
   const { status } = useRealtime();
 
   return (
     <span className="rx-realtime-status" role="status" aria-label={STATUS_LABEL[status]} title={STATUS_LABEL[status]}>
       <span className={`rx-realtime-dot rx-realtime-dot--${status}`} aria-hidden="true" />
+      <span className="rx-realtime-text d-none d-sm-inline">{STATUS_TEXT[status]}</span>
     </span>
   );
 }

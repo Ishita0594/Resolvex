@@ -72,4 +72,39 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText(/invalid email or password/i)).toBeInTheDocument();
   });
+
+  it('rejects an obviously malformed email before calling the API', async () => {
+    const loginSpy = vi.spyOn(authApi, 'login');
+
+    renderLoginPage();
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/email address/i), 'not-an-email');
+    await user.type(screen.getByLabelText(/^password$/i), 'ResolveXDemo123!');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByText(/enter a valid email address/i)).toBeInTheDocument();
+    expect(loginSpy).not.toHaveBeenCalled();
+  });
+
+  it('shows a friendly message when the server is unreachable', async () => {
+    vi.spyOn(authApi, 'login').mockRejectedValueOnce(
+      new ApiError({
+        statusCode: 0,
+        error: 'NETWORK_ERROR',
+        message: 'Unable to reach the ResolveX server. Check your connection and try again.',
+        timestamp: new Date().toISOString(),
+        path: '/api/auth/login',
+      }),
+    );
+
+    renderLoginPage();
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText(/email address/i), 'member@resolvex.demo');
+    await user.type(screen.getByLabelText(/^password$/i), 'ResolveXDemo123!');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
+    expect(await screen.findByText(/unable to reach the resolvex server/i)).toBeInTheDocument();
+  });
 });

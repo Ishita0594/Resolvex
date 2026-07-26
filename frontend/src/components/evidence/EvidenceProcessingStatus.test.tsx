@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EvidenceProcessingStatus } from './EvidenceProcessingStatus';
 import * as evidenceApi from '../../api/evidence';
@@ -97,5 +97,35 @@ describe('EvidenceProcessingStatus', () => {
 
     expect(getSpy).toHaveBeenCalledWith('evidence-1');
     expect(onUpdated).toHaveBeenCalledWith(expect.objectContaining({ processingStatus: 'PROCESSED' }));
+  });
+
+  it('stops auto-polling and offers a manual check once processing has taken too long', async () => {
+    vi.useFakeTimers();
+    const getSpy = vi.spyOn(evidenceApi, 'getEvidence').mockResolvedValue(buildEvidence({ processingStatus: 'PROCESSING' }));
+    const onUpdated = vi.fn();
+
+    render(<EvidenceProcessingStatus evidence={buildEvidence({ processingStatus: 'PROCESSING' })} canManage onUpdated={onUpdated} />);
+
+    // Comfortably past MAX_POLL_ATTEMPTS (15) at POLL_INTERVAL_MS (4000ms) each.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(20 * 4000);
+    });
+
+    expect(screen.getByText(/taking longer than expected/i)).toBeInTheDocument();
+    const checkNowButton = screen.getByRole('button', { name: /check status now/i });
+    expect(checkNowButton).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Processing' })).not.toBeInTheDocument();
+
+    const callsAtTimeout = getSpy.mock.calls.length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4000);
+    });
+    expect(getSpy.mock.calls.length).toBe(callsAtTimeout);
+
+    await act(async () => {
+      fireEvent.click(checkNowButton);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(getSpy.mock.calls.length).toBe(callsAtTimeout + 1);
   });
 });

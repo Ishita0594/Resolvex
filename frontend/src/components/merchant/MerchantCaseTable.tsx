@@ -6,8 +6,21 @@ import { CurrencyDisplay } from '../common/CurrencyDisplay';
 import { DeadlineBadge } from '../common/DeadlineBadge';
 import { formatDate } from '../../utils/format';
 import { canSubmitMerchantResponse } from '../../utils/merchantCase';
+import { useIsMobileViewport } from '../../hooks/useMediaQuery';
 
 export function MerchantCaseTable({ disputes }: { disputes: DisputeCase[] }) {
+  const isMobile = useIsMobileViewport();
+
+  if (isMobile) {
+    return (
+      <div className="rx-card p-3">
+        {disputes.map((dispute) => (
+          <MerchantCaseCard key={dispute.id} dispute={dispute} />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="rx-card p-0">
       <div className="table-responsive">
@@ -69,6 +82,49 @@ export function MerchantCaseTable({ disputes }: { disputes: DisputeCase[] }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function MerchantCaseCard({ dispute }: { dispute: DisputeCase }) {
+  const canRespond = canSubmitMerchantResponse(dispute);
+
+  return (
+    <div className="rx-table-card">
+      <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+        <span className="small font-monospace text-muted">{dispute.id}</span>
+        <CaseStatusBadge status={dispute.status} />
+      </div>
+      <p className="mb-2 small">{dispute.cardMemberStatement}</p>
+      <dl className="mb-0">
+        <div className="rx-table-card-row">
+          <dt>Category</dt>
+          <dd>{REASON_CODE_LABELS[dispute.reasonCode]}</dd>
+        </div>
+        <div className="rx-table-card-row">
+          <dt>Amount</dt>
+          <dd>
+            <CurrencyDisplay amount={dispute.transaction.amount} currency={dispute.transaction.currency} />
+          </dd>
+        </div>
+        <div className="rx-table-card-row">
+          <dt>Received</dt>
+          <dd>{formatDate(dispute.createdAt)}</dd>
+        </div>
+        <div className="rx-table-card-row">
+          <dt>Response deadline</dt>
+          <dd>
+            <div>{formatDate(dispute.responseDeadline)}</div>
+            <DeadlineBadge dispute={dispute} />
+          </dd>
+        </div>
+      </dl>
+      <Link
+        to={`/merchant/disputes/${dispute.id}`}
+        className={`btn btn-sm w-100 mt-3 ${canRespond ? 'btn-primary' : 'btn-outline-primary'}`}
+      >
+        {canRespond ? 'Respond' : 'View'}
+      </Link>
     </div>
   );
 }

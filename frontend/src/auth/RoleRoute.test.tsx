@@ -21,6 +21,7 @@ function renderAnalystRoute() {
         <Routes>
           <Route path="/login" element={<div>Login page</div>} />
           <Route path="/unauthorized" element={<div>Unauthorized page</div>} />
+          <Route path="/forbidden" element={<div>Forbidden page</div>} />
           <Route element={<ProtectedRoute />}>
             <Route element={<RoleRoute allow={['ANALYST']} />}>
               <Route path="/analyst/queue" element={<div>Analyst queue page</div>} />
@@ -38,20 +39,20 @@ describe('RoleRoute', () => {
     vi.restoreAllMocks();
   });
 
-  it('redirects an unauthenticated visitor to log in rather than exposing the analyst route', async () => {
+  it('sends an unauthenticated visitor to the unauthorized (sign-in required) page rather than exposing the analyst route', async () => {
     renderAnalystRoute();
 
-    expect(await screen.findByText('Login page')).toBeInTheDocument();
+    expect(await screen.findByText('Unauthorized page')).toBeInTheDocument();
     expect(screen.queryByText('Analyst queue page')).not.toBeInTheDocument();
   });
 
-  it('redirects a card member away from an analyst-only route', async () => {
+  it('redirects a card member away from an analyst-only route to the forbidden page', async () => {
     vi.spyOn(authApi, 'fetchProfile').mockResolvedValue(CARD_MEMBER_USER);
     window.localStorage.setItem('resolvex.accessToken', 'test-token');
 
     renderAnalystRoute();
 
-    expect(await screen.findByText('Unauthorized page')).toBeInTheDocument();
+    expect(await screen.findByText('Forbidden page')).toBeInTheDocument();
     expect(screen.queryByText('Analyst queue page')).not.toBeInTheDocument();
   });
 

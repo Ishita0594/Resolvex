@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { getEvidenceDownloadUrl, replaceEvidenceFacts } from '../../api/evidence';
+import { ErrorAlert } from '../common/ErrorAlert';
 import { ErrorState, type ErrorStateVariant } from '../common/ErrorState';
 import { LoadingSkeleton } from '../common/LoadingSkeleton';
 import { ROLE_LABELS } from '../../auth/roles';
@@ -165,8 +166,8 @@ function EvidenceReviewItem({
             {isDownloading ? 'Opening…' : 'Preview / download'}
           </button>
           {downloadError ? (
-            <div className="alert alert-danger py-2 mt-2 mb-0" role="alert">
-              {downloadError}
+            <div className="mt-2">
+              <ErrorAlert message={downloadError} />
             </div>
           ) : null}
         </div>

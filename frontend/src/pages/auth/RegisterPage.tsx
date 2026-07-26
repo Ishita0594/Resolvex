@@ -2,8 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { DASHBOARD_PATH_BY_ROLE, ROLE_LABELS } from '../../auth/roles';
-import { ApiError } from '../../api/client';
+import { ErrorAlert } from '../../components/common/ErrorAlert';
 import { AuthBrandPanel } from './AuthBrandPanel';
+import { submitErrorMessage } from '../../utils/apiError';
+import { isValidEmail } from '../../utils/validation';
 import type { UserRole } from '../../types/domain';
 
 const ROLE_OPTIONS: UserRole[] = ['CARD_MEMBER', 'MERCHANT', 'ANALYST'];
@@ -15,6 +17,7 @@ export function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('CARD_MEMBER');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +30,13 @@ export function RegisterPage() {
     event.preventDefault();
     setError(null);
 
-    if (!name.trim() || !email.trim() || !password) {
+    if (!name.trim() || !email.trim() || !password || !confirmPassword) {
       setError('Fill in every field to create your account.');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setError('Enter a valid email address.');
       return;
     }
 
@@ -37,12 +45,17 @@ export function RegisterPage() {
       return;
     }
 
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const newUser = await register({ name: name.trim(), email: email.trim(), password, role });
       navigate(DASHBOARD_PATH_BY_ROLE[newUser.role], { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+      setError(submitErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -57,11 +70,7 @@ export function RegisterPage() {
           <h1 className="h3 fw-bold mb-1">Create your account</h1>
           <p className="text-muted mb-4">Prototype accounts only &mdash; no real cardholder data.</p>
 
-          {error ? (
-            <div className="alert alert-danger py-2" role="alert">
-              {error}
-            </div>
-          ) : null}
+          {error ? <ErrorAlert message={error} /> : null}
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="mb-3">
@@ -109,6 +118,22 @@ export function RegisterPage() {
                 minLength={8}
               />
               <div className="form-text">At least 8 characters.</div>
+            </div>
+
+            <div className="mb-3">
+              <label htmlFor="register-confirm-password" className="form-label fw-semibold">
+                Confirm password
+              </label>
+              <input
+                id="register-confirm-password"
+                type="password"
+                className="form-control form-control-lg"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                required
+                minLength={8}
+              />
             </div>
 
             <div className="mb-4">

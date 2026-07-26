@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ROLE_LABELS } from '../../auth/roles';
 import { NotificationDropdown } from '../notifications/NotificationDropdown';
@@ -28,6 +29,12 @@ const NAV_ITEMS_BY_ROLE: Record<UserRole, NavItem[]> = {
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [location.pathname]);
 
   if (!user) {
     return null;
@@ -37,6 +44,16 @@ export function AppLayout() {
     <div className="rx-app-shell">
       <header className="rx-topbar">
         <div className="d-flex align-items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-sm btn-outline-light rx-mobile-nav-toggle"
+            aria-label={isMobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={isMobileNavOpen}
+            aria-controls="rx-sidebar-nav"
+            onClick={() => setIsMobileNavOpen((open) => !open)}
+          >
+            <i className={`bi ${isMobileNavOpen ? 'bi-x-lg' : 'bi-list'}`} aria-hidden="true" />
+          </button>
           <span className="rx-brand-mark-icon" style={{ width: 28, height: 28, fontSize: '0.85rem' }}>
             RX
           </span>
@@ -61,7 +78,15 @@ export function AppLayout() {
       </header>
 
       <div className="d-flex flex-grow-1">
-        <nav className="rx-sidebar d-none d-md-block" style={{ width: 240 }}>
+        {isMobileNavOpen ? (
+          <div className="rx-sidebar-backdrop d-md-none" onClick={() => setIsMobileNavOpen(false)} />
+        ) : null}
+
+        <nav
+          id="rx-sidebar-nav"
+          className={`rx-sidebar d-md-block${isMobileNavOpen ? ' rx-sidebar--open' : ' d-none'}`}
+          style={{ width: 240 }}
+        >
           {NAV_ITEMS_BY_ROLE[user.role].map((item) => (
             <NavLink
               key={item.to}

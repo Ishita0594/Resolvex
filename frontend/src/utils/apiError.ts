@@ -13,3 +13,11 @@ export function resolveApiError(err: unknown, fallbackMessage: string): { messag
   }
   return { message: fallbackMessage, variant: 'error' };
 }
+
+/** Message to show inline after a failed form submission (as opposed to a failed page load). */
+export function submitErrorMessage(err: unknown, fallbackMessage = 'Something went wrong. Please try again.'): string {
+  if (err instanceof ApiError) {
+    return err.message;
+  }
+  return fallbackMessage;
+}

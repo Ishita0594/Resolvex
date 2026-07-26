@@ -560,7 +560,14 @@ body {
 .rx-realtime-status {
   display: inline-flex;
   align-items: center;
-  padding: 0.3rem;
+  gap: 0.4rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.rx-realtime-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .rx-realtime-dot {
@@ -577,4 +584,110 @@ body {
 @keyframes rx-realtime-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+/* -------------------------------------------------- */
+/* Offline / API-unavailable banner                     */
+/* -------------------------------------------------- */
+
+.rx-offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: var(--rx-status-review);
+  color: var(--rx-white);
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+}
+
+/* -------------------------------------------------- */
+/* Responsive: mobile nav + table-to-card collapse      */
+/* -------------------------------------------------- */
+
+.rx-mobile-nav-toggle {
+  display: none;
+}
+
+@media (max-width: 767.98px) {
+  .rx-mobile-nav-toggle {
+    display: inline-flex;
+  }
+
+  .rx-sidebar {
+    position: fixed;
+    inset: 0 25% 0 0;
+    z-index: 50;
+    min-height: 100vh;
+    box-shadow: var(--rx-shadow-lg);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+
+  .rx-sidebar.rx-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .rx-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 31, 68, 0.45);
+    z-index: 45;
+  }
+
+  .rx-topbar {
+    padding: 0.65rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .rx-main {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .rx-notification-panel {
+    position: fixed;
+    top: 56px;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+  }
+}
+
+.rx-table-card {
+  border: 1px solid var(--rx-gray-200);
+  border-radius: var(--rx-radius-md);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.rx-table-card:last-child {
+  margin-bottom: 0;
+}
+
+.rx-table-card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--rx-gray-100);
+  font-size: 0.85rem;
+}
+
+.rx-table-card-row:last-child {
+  border-bottom: none;
+}
+
+.rx-table-card-row dt {
+  color: var(--rx-gray-500);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.rx-table-card-row dd {
+  margin: 0;
+  text-align: right;
 }

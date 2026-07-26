@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { getEvidenceDownloadUrl } from '../../api/evidence';
-import { ApiError } from '../../api/client';
+import { ErrorAlert } from '../common/ErrorAlert';
 import { EvidenceStatusBadge } from '../common/StatusBadge';
 import type { EvidenceItem } from '../../types/domain';
 import { formatDateTime, formatFileSize, humanizeLabel } from '../../utils/format';
+import { submitErrorMessage } from '../../utils/apiError';
 
 interface EvidenceCardProps {
   evidence: EvidenceItem;
@@ -33,7 +34,7 @@ export function EvidenceCard({
       const target = await getEvidenceDownloadUrl(evidence.id);
       window.open(target.downloadUrl, '_blank', 'noopener,noreferrer');
     } catch (err) {
-      setDownloadError(err instanceof ApiError ? err.message : 'Unable to open this file right now.');
+      setDownloadError(submitErrorMessage(err, 'Unable to open this file right now.'));
     } finally {
       setIsDownloading(false);
     }
@@ -53,8 +54,8 @@ export function EvidenceCard({
       </div>
 
       {downloadError ? (
-        <div className="alert alert-danger py-2 mt-2 mb-0" role="alert">
-          {downloadError}
+        <div className="mt-2">
+          <ErrorAlert message={downloadError} />
         </div>
       ) : null}
 

@@ -2,8 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, type Location } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { DASHBOARD_PATH_BY_ROLE } from '../../auth/roles';
-import { ApiError } from '../../api/client';
+import { ErrorAlert } from '../../components/common/ErrorAlert';
 import { AuthBrandPanel } from './AuthBrandPanel';
+import { submitErrorMessage } from '../../utils/apiError';
+import { isValidEmail } from '../../utils/validation';
 import type { UserRole } from '../../types/domain';
 
 const DEMO_ACCOUNTS: { role: UserRole; label: string; email: string }[] = [
@@ -36,13 +38,18 @@ export function LoginPage() {
       setError('Enter your email and password to continue.');
       return;
     }
+    if (!isValidEmail(email)) {
+      setError('Enter a valid email address.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       const loggedInUser = await login({ email: email.trim(), password });
-      navigate(DASHBOARD_PATH_BY_ROLE[loggedInUser.role], { replace: true });
+      const redirectTo = (location.state as { from?: Location } | null)?.from?.pathname ?? DASHBOARD_PATH_BY_ROLE[loggedInUser.role];
+      navigate(redirectTo, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+      setError(submitErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -63,11 +70,7 @@ export function LoginPage() {
           <h1 className="h3 fw-bold mb-1">Welcome back</h1>
           <p className="text-muted mb-4">Sign in to review, submit, or resolve a dispute.</p>
 
-          {error ? (
-            <div className="alert alert-danger py-2" role="alert">
-              {error}
-            </div>
-          ) : null}
+          {error ? <ErrorAlert message={error} /> : null}
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="mb-3">

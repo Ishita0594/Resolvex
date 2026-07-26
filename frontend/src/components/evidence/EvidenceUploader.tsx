@@ -6,12 +6,13 @@ import {
   isEvidenceUploadCanceled,
   uploadEvidenceFile,
 } from '../../api/evidence';
-import { ApiError } from '../../api/client';
+import { ErrorAlert } from '../common/ErrorAlert';
 import type { EvidenceTypeOption } from '../../constants/evidenceTypes';
 import { DEFAULT_MAX_EVIDENCE_FILE_SIZE_BYTES, EVIDENCE_FILE_INPUT_ACCEPT } from '../../constants/evidenceTypes';
 import type { EvidenceItem } from '../../types/domain';
 import { formatFileSize } from '../../utils/format';
 import { validateEvidenceFileClientSide } from '../../utils/evidenceFile';
+import { submitErrorMessage } from '../../utils/apiError';
 
 type QueueItemStatus = 'uploading' | 'confirming' | 'success' | 'error' | 'canceled' | 'rejected';
 
@@ -89,7 +90,7 @@ export function EvidenceUploader({
         updateItem(id, { status: 'canceled' });
         return;
       }
-      const message = err instanceof ApiError ? err.message : 'Upload failed. Check your connection and try again.';
+      const message = submitErrorMessage(err, 'Upload failed. Check your connection and try again.');
       updateItem(id, { status: 'error', errorMessage: message });
     }
   }
@@ -167,11 +168,7 @@ export function EvidenceUploader({
         </select>
       </div>
 
-      {formError ? (
-        <div className="alert alert-danger py-2" role="alert">
-          {formError}
-        </div>
-      ) : null}
+      {formError ? <ErrorAlert message={formError} /> : null}
 
       <div
         className={`rx-dropzone${isDragActive ? ' rx-dropzone--active' : ''}`}

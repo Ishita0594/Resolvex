@@ -6,7 +6,7 @@ export function RoleRoute({ allow }: { allow: UserRole[] }) {
   const { user } = useAuth();
 
   if (!user || !allow.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/forbidden" replace />;
   }
 
   return <Outlet />;

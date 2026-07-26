@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ApiError } from '../../api/client';
 import { getTransaction } from '../../api/transactions';
 import { createDispute } from '../../api/disputes';
+import { ErrorAlert } from '../../components/common/ErrorAlert';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
-import { resolveApiError } from '../../utils/apiError';
+import { Modal } from '../../components/common/Modal';
+import { resolveApiError, submitErrorMessage } from '../../utils/apiError';
+import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { formatDate, toDateInputValue } from '../../utils/format';
 import type { ReasonCode, Transaction } from '../../types/domain';
 import { REASON_CODE_LABELS } from '../../types/domain';
@@ -71,6 +73,10 @@ export function CreateDisputePage() {
       .finally(() => setIsLoading(false));
   }, [transactionId]);
 
+  const hasUnsavedChanges =
+    !isConfirmOpen && (statement.trim().length > 0 || reasonCode !== '' || expectedResolution !== '' || declarationChecked);
+  useUnsavedChangesWarning(hasUnsavedChanges);
+
   function validate(): string | null {
     if (!reasonCode) return 'Choose a reason for this dispute.';
     if (!statement.trim() || statement.trim().length < STATEMENT_MIN_LENGTH) {
@@ -115,7 +121,7 @@ export function CreateDisputePage() {
       });
       navigate(`/member/disputes/${dispute.id}`, { replace: true });
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+      setSubmitError(submitErrorMessage(err));
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
@@ -159,11 +165,7 @@ export function CreateDisputePage() {
       </div>
 
       <div className="rx-card p-4">
-        {validationError ? (
-          <div className="alert alert-danger py-2" role="alert">
-            {validationError}
-          </div>
-        ) : null}
+        {validationError ? <ErrorAlert message={validationError} /> : null}
 
         <form onSubmit={handleReview} noValidate>
           <div className="mb-3">
@@ -265,59 +267,52 @@ export function CreateDisputePage() {
       </div>
 
       {isConfirmOpen ? (
-        <div className="modal d-block" role="dialog" aria-modal="true" style={{ background: 'rgba(10, 31, 68, 0.55)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h2 className="modal-title h5">Confirm your dispute</h2>
-                <button type="button" className="btn-close" aria-label="Close" onClick={closeConfirm} disabled={isSubmitting} />
-              </div>
-              <div className="modal-body">
-                {submitError ? (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {submitError}
-                  </div>
-                ) : null}
-                <dl className="row mb-0">
-                  <dt className="col-5 text-muted fw-normal">Merchant</dt>
-                  <dd className="col-7">{transaction.merchantName}</dd>
+        <Modal
+          titleId="confirm-dispute-title"
+          title="Confirm your dispute"
+          onClose={closeConfirm}
+          closeDisabled={isSubmitting}
+          footer={
+            <>
+              <button type="button" className="btn btn-outline-secondary" onClick={closeConfirm} disabled={isSubmitting}>
+                Go back
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleConfirmSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+                    Submitting&hellip;
+                  </>
+                ) : (
+                  'Confirm and submit'
+                )}
+              </button>
+            </>
+          }
+        >
+          {submitError ? <ErrorAlert message={submitError} /> : null}
+          <dl className="row mb-0">
+            <dt className="col-5 text-muted fw-normal">Merchant</dt>
+            <dd className="col-7">{transaction.merchantName}</dd>
 
-                  <dt className="col-5 text-muted fw-normal">Amount</dt>
-                  <dd className="col-7">
-                    <CurrencyDisplay amount={transaction.amount} currency={transaction.currency} />
-                  </dd>
+            <dt className="col-5 text-muted fw-normal">Amount</dt>
+            <dd className="col-7">
+              <CurrencyDisplay amount={transaction.amount} currency={transaction.currency} />
+            </dd>
 
-                  <dt className="col-5 text-muted fw-normal">Reason</dt>
-                  <dd className="col-7">{reasonCode ? REASON_CODE_LABELS[reasonCode] : ''}</dd>
+            <dt className="col-5 text-muted fw-normal">Reason</dt>
+            <dd className="col-7">{reasonCode ? REASON_CODE_LABELS[reasonCode] : ''}</dd>
 
-                  <dt className="col-5 text-muted fw-normal">Issue date</dt>
-                  <dd className="col-7">{issueDate ? formatDate(issueDate) : ''}</dd>
+            <dt className="col-5 text-muted fw-normal">Issue date</dt>
+            <dd className="col-7">{issueDate ? formatDate(issueDate) : ''}</dd>
 
-                  <dt className="col-5 text-muted fw-normal">Requested resolution</dt>
-                  <dd className="col-7">{expectedResolution ? EXPECTED_RESOLUTION_LABELS[expectedResolution] : ''}</dd>
-                </dl>
-                <p className="mt-3 mb-0 small text-muted" style={{ whiteSpace: 'pre-wrap' }}>
-                  {statement.trim()}
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline-secondary" onClick={closeConfirm} disabled={isSubmitting}>
-                  Go back
-                </button>
-                <button type="button" className="btn btn-primary" onClick={handleConfirmSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
-                      Submitting&hellip;
-                    </>
-                  ) : (
-                    'Confirm and submit'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+            <dt className="col-5 text-muted fw-normal">Requested resolution</dt>
+            <dd className="col-7">{expectedResolution ? EXPECTED_RESOLUTION_LABELS[expectedResolution] : ''}</dd>
+          </dl>
+          <p className="mt-3 mb-0 small text-muted" style={{ whiteSpace: 'pre-wrap' }}>
+            {statement.trim()}
+          </p>
+        </Modal>
       ) : null}
     </div>
   );

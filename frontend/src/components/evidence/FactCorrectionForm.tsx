@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ErrorAlert } from '../common/ErrorAlert';
 import type { ExtractedFact } from '../../types/domain';
 
 export interface FactCorrectionInput {
@@ -51,11 +52,7 @@ export function FactCorrectionForm({ fact, isSubmitting = false, submitError = n
           <dd className="col-8">{verified ? 'Yes' : 'No'}</dd>
         </dl>
 
-        {submitError ? (
-          <div className="alert alert-danger py-2" role="alert">
-            {submitError}
-          </div>
-        ) : null}
+        {submitError ? <ErrorAlert message={submitError} /> : null}
 
         <div className="d-flex gap-2">
           <button type="button" className="btn btn-sm btn-primary" onClick={handleConfirm} disabled={isSubmitting}>
@@ -101,11 +98,7 @@ export function FactCorrectionForm({ fact, isSubmitting = false, submitError = n
         </label>
       </div>
 
-      {validationError ? (
-        <div className="alert alert-danger py-2" role="alert">
-          {validationError}
-        </div>
-      ) : null}
+      {validationError ? <ErrorAlert message={validationError} /> : null}
 
       <div className="d-flex gap-2">
         <button type="button" className="btn btn-sm btn-primary" onClick={handleReview} disabled={!hasChanges}>

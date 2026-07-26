@@ -12,6 +12,7 @@ interface NotificationsContextValue {
   notifications: Notification[];
   unreadCount: number;
   isLoading: boolean;
+  loadError: string | null;
   markRead: (notificationId: string) => Promise<void>;
   markAllRead: () => Promise<void>;
   reload: () => void;
@@ -24,15 +25,21 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { showToast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!isAuthenticated) {
       return;
     }
     listNotifications()
-      .then(setNotifications)
+      .then((data) => {
+        setNotifications(data);
+        setLoadError(null);
+      })
       .catch(() => {
-        // Silent: the bell just won't refresh this cycle; the next poll or realtime event retries.
+        // Don't clear existing notifications on a transient failure; just let the user know the
+        // bell may be stale and offer a manual retry. The next poll or realtime event may also recover it.
+        setLoadError('Unable to refresh notifications right now.');
       })
       .finally(() => setIsLoading(false));
   }, [isAuthenticated]);
@@ -79,7 +86,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const unreadCount = notifications.filter((item) => !item.isRead).length;
 
   return (
-    <NotificationsContext.Provider value={{ notifications, unreadCount, isLoading, markRead, markAllRead, reload: load }}>
+    <NotificationsContext.Provider value={{ notifications, unreadCount, isLoading, loadError, markRead, markAllRead, reload: load }}>
       {children}
     </NotificationsContext.Provider>
   );

@@ -23,7 +23,9 @@ import { AnalystCasePage } from './pages/analyst/AnalystCasePage';
 import { DecisionExplanationPage } from './pages/shared/DecisionExplanationPage';
 import { NotFoundPage } from './pages/misc/NotFoundPage';
 import { UnauthorizedPage } from './pages/misc/UnauthorizedPage';
+import { ForbiddenPage } from './pages/misc/ForbiddenPage';
 import { SessionExpiredModal } from './components/common/SessionExpiredModal';
+import { OfflineBanner } from './components/common/OfflineBanner';
 
 function RootRedirect() {
   const { isAuthenticated, user, isLoading } = useAuth();
@@ -46,6 +48,7 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/unauthorized" element={<UnauthorizedPage />} />
+      <Route path="/forbidden" element={<ForbiddenPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
@@ -82,6 +85,7 @@ export function App() {
       <ToastProvider>
         <RealtimeProvider>
           <NotificationsProvider>
+            <OfflineBanner />
             <AppRoutes />
             <SessionExpiredModal />
           </NotificationsProvider>

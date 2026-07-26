@@ -2,13 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getMerchantDispute, getPolicyRequirements, submitMerchantResponse } from '../../api/merchant';
 import { listCaseEvidence } from '../../api/evidence';
-import { ApiError } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import { CaseStatusBadge } from '../../components/common/StatusBadge';
 import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 import { DeadlineBadge } from '../../components/common/DeadlineBadge';
+import { ErrorAlert } from '../../components/common/ErrorAlert';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { Modal } from '../../components/common/Modal';
 import { PolicyChecklist, type PolicyChecklistEntry } from '../../components/merchant/PolicyChecklist';
 import { DecisionStatusCard } from '../../components/decision/DecisionStatusCard';
 import { EvidenceList } from '../../components/evidence/EvidenceList';
@@ -18,7 +19,8 @@ import type { EvidenceTypeOption } from '../../constants/evidenceTypes';
 import { useCaseEvaluation } from '../../hooks/useCaseEvaluation';
 import { useCaseEvent } from '../../realtime/useCaseEvent';
 import { useRealtime } from '../../realtime/RealtimeContext';
-import { resolveApiError } from '../../utils/apiError';
+import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
+import { resolveApiError, submitErrorMessage } from '../../utils/apiError';
 import { formatDate, humanizeLabel } from '../../utils/format';
 import { canSubmitMerchantResponse, isDeadlineExpired } from '../../utils/merchantCase';
 import type { CaseEventPayload, DisputeCase, EvidenceItem, PolicyRequirement } from '../../types/domain';
@@ -123,6 +125,8 @@ export function MerchantCaseDetailsPage() {
     return Array.from(seen.values());
   }, [requirements]);
 
+  useUnsavedChangesWarning(!isConfirmOpen && statement.trim().length > 0);
+
   const alreadySubmitted = dispute?.merchantResponseStatus === 'SUBMITTED';
   const canRespond = dispute ? canSubmitMerchantResponse(dispute) : false;
   const deadlineExpired = dispute ? isDeadlineExpired(dispute) : false;
@@ -184,7 +188,7 @@ export function MerchantCaseDetailsPage() {
       setDispute(updatedDispute);
       setIsConfirmOpen(false);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+      setSubmitError(submitErrorMessage(err));
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
@@ -297,11 +301,7 @@ export function MerchantCaseDetailsPage() {
               </div>
             ) : (
               <>
-                {validationError ? (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {validationError}
-                  </div>
-                ) : null}
+                {validationError ? <ErrorAlert message={validationError} /> : null}
 
                 <div className="mb-3">
                   <label htmlFor="merchant-statement" className="form-label fw-semibold">
@@ -386,44 +386,35 @@ export function MerchantCaseDetailsPage() {
       </div>
 
       {isConfirmOpen ? (
-        <div className="modal d-block" role="dialog" aria-modal="true" style={{ background: 'rgba(10, 31, 68, 0.55)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h2 className="modal-title h5">Confirm your response</h2>
-                <button type="button" className="btn-close" aria-label="Close" onClick={closeConfirm} disabled={isSubmitting} />
-              </div>
-              <div className="modal-body">
-                {submitError ? (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {submitError}
-                  </div>
-                ) : null}
-                <p className="text-muted small mb-2">
-                  Once submitted, this response is final and cannot be resubmitted or edited.
-                </p>
-                <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
-                  {statement.trim()}
-                </p>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline-secondary" onClick={closeConfirm} disabled={isSubmitting}>
-                  Go back
-                </button>
-                <button type="button" className="btn btn-primary" onClick={handleConfirmSubmit} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
-                      Submitting&hellip;
-                    </>
-                  ) : (
-                    'Confirm and submit'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Modal
+          titleId="confirm-response-title"
+          title="Confirm your response"
+          onClose={closeConfirm}
+          closeDisabled={isSubmitting}
+          footer={
+            <>
+              <button type="button" className="btn btn-outline-secondary" onClick={closeConfirm} disabled={isSubmitting}>
+                Go back
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleConfirmSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+                    Submitting&hellip;
+                  </>
+                ) : (
+                  'Confirm and submit'
+                )}
+              </button>
+            </>
+          }
+        >
+          {submitError ? <ErrorAlert message={submitError} /> : null}
+          <p className="text-muted small mb-2">Once submitted, this response is final and cannot be resubmitted or edited.</p>
+          <p className="mb-0" style={{ whiteSpace: 'pre-wrap' }}>
+            {statement.trim()}
+          </p>
+        </Modal>
       ) : null}
     </div>
   );

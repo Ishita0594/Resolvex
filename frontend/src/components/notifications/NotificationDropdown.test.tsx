@@ -107,6 +107,27 @@ describe('NotificationDropdown', () => {
     expect(await screen.findByText('Case details page')).toBeInTheDocument();
   });
 
+  it('shows a retry option when notifications fail to load, and recovers on retry', async () => {
+    const listSpy = vi
+      .spyOn(notificationsApi, 'listNotifications')
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce([buildNotification()]);
+
+    renderDropdown();
+    const user = userEvent.setup();
+
+    const bellButton = await screen.findByLabelText('Notifications');
+    await user.click(bellButton);
+
+    expect(await screen.findByText(/unable to refresh notifications/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /retry/i }));
+
+    await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Case update')).toBeInTheDocument();
+    expect(screen.queryByText(/unable to refresh notifications/i)).not.toBeInTheDocument();
+  });
+
   it('marks all notifications read', async () => {
     vi.spyOn(notificationsApi, 'listNotifications').mockResolvedValue([
       buildNotification({ id: 'notif-1', isRead: false }),

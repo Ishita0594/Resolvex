@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react';
 import { submitAnalystDecision } from '../../api/analyst';
-import { ApiError } from '../../api/client';
+import { ErrorAlert } from '../common/ErrorAlert';
+import { Modal } from '../common/Modal';
 import { ANALYST_DECISION_LABELS, CASE_STATUS_LABELS } from '../../types/domain';
 import type { AnalystDecision, AnalystDecisionResult, RecommendedOutcome } from '../../types/domain';
 import { decisionAlignsWithRecommendation, statusForAnalystDecision } from '../../utils/analystQueue';
+import { submitErrorMessage } from '../../utils/apiError';
+import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 
 const DECISION_ORDER: AnalystDecision[] = ['SUPPORT_CARD_MEMBER', 'SUPPORT_MERCHANT', 'REQUEST_MORE_INFORMATION', 'ESCALATE'];
 
@@ -32,6 +35,8 @@ export function AnalystDecisionPanel({ caseId, latestRecommendation, disabled, d
   const isSubmittingRef = useRef(false);
 
   const requiresOverride = pendingDecision !== null && !decisionAlignsWithRecommendation(pendingDecision, latestRecommendation);
+
+  useUnsavedChangesWarning(pendingDecision !== null && (overrideReason.trim().length > 0 || analystNotes.trim().length > 0));
 
   function openConfirm(decision: AnalystDecision) {
     setPendingDecision(decision);
@@ -71,7 +76,7 @@ export function AnalystDecisionPanel({ caseId, latestRecommendation, disabled, d
       setPendingDecision(null);
       onDecided(result);
     } catch (err) {
-      setSubmitError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+      setSubmitError(submitErrorMessage(err));
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
@@ -98,80 +103,67 @@ export function AnalystDecisionPanel({ caseId, latestRecommendation, disabled, d
       </div>
 
       {pendingDecision ? (
-        <div className="modal d-block" role="dialog" aria-modal="true" style={{ background: 'rgba(10, 31, 68, 0.55)' }}>
-          <div className="modal-dialog modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h2 className="modal-title h5">Confirm decision</h2>
-                <button type="button" className="btn-close" aria-label="Close" onClick={closeConfirm} disabled={isSubmitting} />
-              </div>
-              <div className="modal-body">
-                {submitError ? (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {submitError}
-                  </div>
-                ) : null}
-                {validationError ? (
-                  <div className="alert alert-danger py-2" role="alert">
-                    {validationError}
-                  </div>
-                ) : null}
+        <Modal
+          titleId="confirm-decision-title"
+          title="Confirm decision"
+          onClose={closeConfirm}
+          closeDisabled={isSubmitting}
+          footer={
+            <>
+              <button type="button" className="btn btn-outline-secondary" onClick={closeConfirm} disabled={isSubmitting}>
+                Go back
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleConfirm} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
+                    Submitting&hellip;
+                  </>
+                ) : (
+                  'Confirm decision'
+                )}
+              </button>
+            </>
+          }
+        >
+          {submitError ? <ErrorAlert message={submitError} /> : null}
+          {validationError ? <ErrorAlert message={validationError} /> : null}
 
-                <p className="mb-3">
-                  You are about to record <strong>{ANALYST_DECISION_LABELS[pendingDecision]}</strong> for this case. The case
-                  status will change to <strong>{CASE_STATUS_LABELS[statusForAnalystDecision(pendingDecision)]}</strong>.
-                </p>
+          <p className="mb-3">
+            You are about to record <strong>{ANALYST_DECISION_LABELS[pendingDecision]}</strong> for this case. The case
+            status will change to <strong>{CASE_STATUS_LABELS[statusForAnalystDecision(pendingDecision)]}</strong>.
+          </p>
 
-                {requiresOverride ? (
-                  <div className="mb-3">
-                    <label htmlFor="override-reason" className="form-label fw-semibold">
-                      Override reason <span className="text-danger">*</span>
-                    </label>
-                    <p className="text-muted small mb-2">
-                      Required because this decision differs from the system&apos;s recommendation.
-                    </p>
-                    <textarea
-                      id="override-reason"
-                      className="form-control"
-                      rows={3}
-                      value={overrideReason}
-                      onChange={(event) => setOverrideReason(event.target.value)}
-                      required
-                    />
-                  </div>
-                ) : null}
-
-                <div className="mb-1">
-                  <label htmlFor="analyst-notes" className="form-label fw-semibold">
-                    Analyst notes <span className="text-muted fw-normal">(optional)</span>
-                  </label>
-                  <textarea
-                    id="analyst-notes"
-                    className="form-control"
-                    rows={3}
-                    value={analystNotes}
-                    onChange={(event) => setAnalystNotes(event.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-outline-secondary" onClick={closeConfirm} disabled={isSubmitting}>
-                  Go back
-                </button>
-                <button type="button" className="btn btn-primary" onClick={handleConfirm} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" aria-hidden="true" />
-                      Submitting&hellip;
-                    </>
-                  ) : (
-                    'Confirm decision'
-                  )}
-                </button>
-              </div>
+          {requiresOverride ? (
+            <div className="mb-3">
+              <label htmlFor="override-reason" className="form-label fw-semibold">
+                Override reason <span className="text-danger">*</span>
+              </label>
+              <p className="text-muted small mb-2">Required because this decision differs from the system&apos;s recommendation.</p>
+              <textarea
+                id="override-reason"
+                className="form-control"
+                rows={3}
+                value={overrideReason}
+                onChange={(event) => setOverrideReason(event.target.value)}
+                required
+              />
             </div>
+          ) : null}
+
+          <div className="mb-1">
+            <label htmlFor="analyst-notes" className="form-label fw-semibold">
+              Analyst notes <span className="text-muted fw-normal">(optional)</span>
+            </label>
+            <textarea
+              id="analyst-notes"
+              className="form-control"
+              rows={3}
+              value={analystNotes}
+              onChange={(event) => setAnalystNotes(event.target.value)}
+            />
           </div>
-        </div>
+        </Modal>
       ) : null}
     </div>
   );
