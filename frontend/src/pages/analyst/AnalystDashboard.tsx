@@ -1,20 +1,183 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { listAnalystQueue, listRecentlyResolvedCases } from '../../api/analyst';
 import { useAuth } from '../../auth/AuthContext';
+import { StatTile } from '../../components/analyst/StatTile';
+import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
+import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
+import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { useCaseEvent } from '../../realtime/useCaseEvent';
+import { REASON_CODE_LABELS, RECOMMENDED_OUTCOME_LABELS } from '../../types/domain';
+import type { AnalystQueueCase } from '../../types/domain';
+import { ageInDays, getAnalystPriority, isApproachingDeadline, isDeadlinePassed } from '../../utils/analystQueue';
+import { resolveApiError } from '../../utils/apiError';
+import { formatDate } from '../../utils/format';
 
 export function AnalystDashboard() {
   const { user } = useAuth();
+  const [queue, setQueue] = useState<AnalystQueueCase[] | null>(null);
+  const [resolved, setResolved] = useState<AnalystQueueCase[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<{ message: string; variant: ErrorStateVariant } | null>(null);
+
+  const load = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    Promise.all([listAnalystQueue(), listRecentlyResolvedCases()])
+      .then(([queueData, resolvedData]) => {
+        setQueue(queueData);
+        setResolved(resolvedData);
+      })
+      .catch((err) => setError(resolveApiError(err, 'Unable to load the review dashboard right now.')))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useCaseEvent('analyst.review.required', load);
+  useCaseEvent('decision.generated', load);
+  useCaseEvent('case.status.updated', load);
+
+  if (isLoading) {
+    return <LoadingSkeleton variant="card" rows={4} label="Loading dashboard" />;
+  }
+
+  if (error || !queue || !resolved) {
+    return (
+      <ErrorState message={error?.message ?? 'Unable to load the review dashboard.'} variant={error?.variant ?? 'error'} onRetry={load} />
+    );
+  }
+
+  const highPriorityCount = queue.filter((item) => getAnalystPriority(item) === 'HIGH').length;
+  const approachingDeadlineCount = queue.filter(
+    (item) => isApproachingDeadline(item.responseDeadline) || isDeadlinePassed(item.responseDeadline),
+  ).length;
+  const scoredCases = queue.filter((item) => item.latestConfidence !== null);
+  const averageConfidence =
+    scoredCases.length > 0
+      ? Math.round(scoredCases.reduce((sum, item) => sum + (item.latestConfidence ?? 0), 0) / scoredCases.length)
+      : null;
 
   return (
     <div>
       <h1 className="h3 fw-bold mb-1">Welcome back, {user?.name.split(' ')[0]}</h1>
-      <p className="text-muted mb-4">Cases requiring human review will appear here.</p>
+      <p className="text-muted mb-4">Here&apos;s what needs attention across the review queue.</p>
 
-      <div className="rx-card p-5 text-center">
-        <i className="bi bi-clipboard-check text-primary" style={{ fontSize: '2rem' }} aria-hidden="true" />
-        <h2 className="h5 mt-3 mb-1">Your review queue is coming next</h2>
-        <p className="text-muted mb-0">
-          Phase 7 will surface low-confidence and conflicting cases here with full evidence context.
-        </p>
+      <div className="row g-3 mb-4">
+        <div className="col-sm-6 col-lg-3">
+          <StatTile icon="bi-inbox" label="Awaiting review" value={String(queue.length)} tone="submitted" />
+        </div>
+        <div className="col-sm-6 col-lg-3">
+          <StatTile icon="bi-exclamation-triangle" label="High priority" value={String(highPriorityCount)} tone="review" />
+        </div>
+        <div className="col-sm-6 col-lg-3">
+          <StatTile
+            icon="bi-hourglass-split"
+            label="Approaching deadline"
+            value={String(approachingDeadlineCount)}
+            caption="Within 2 days or past due"
+            tone="processing"
+          />
+        </div>
+        <div className="col-sm-6 col-lg-3">
+          <StatTile icon="bi-bar-chart" label="Average confidence" value={averageConfidence === null ? '—' : `${averageConfidence}%`} />
+        </div>
       </div>
+
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <h2 className="h5 fw-bold mb-0">Review queue</h2>
+        <Link to="/analyst/queue" className="btn btn-sm btn-outline-primary">
+          View full queue
+        </Link>
+      </div>
+
+      {queue.length === 0 ? (
+        <div className="rx-card p-5 text-center mb-4">
+          <i className="bi bi-clipboard-check text-primary" style={{ fontSize: '2rem' }} aria-hidden="true" />
+          <h3 className="h5 mt-3 mb-1">Nothing needs review right now</h3>
+          <p className="text-muted mb-0">New cases will appear here as soon as the policy engine escalates them.</p>
+        </div>
+      ) : (
+        <div className="rx-card p-0 mb-4">
+          <div className="table-responsive">
+            <table className="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Case</th>
+                  <th scope="col">Category</th>
+                  <th scope="col">Amount</th>
+                  <th scope="col">Priority</th>
+                  <th scope="col" className="text-end">
+                    Age
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {queue.slice(0, 5).map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <Link to={`/analyst/cases/${item.id}`} className="text-decoration-none fw-semibold">
+                        {item.merchantName}
+                      </Link>
+                    </td>
+                    <td>{REASON_CODE_LABELS[item.reasonCode]}</td>
+                    <td>
+                      <CurrencyDisplay amount={item.amount} currency={item.currency} />
+                    </td>
+                    <td>
+                      {getAnalystPriority(item) === 'HIGH' ? (
+                        <span className="rx-badge rx-badge--review">High</span>
+                      ) : (
+                        <span className="rx-badge rx-badge--neutral">Standard</span>
+                      )}
+                    </td>
+                    <td className="text-end">{ageInDays(item.createdAt)}d</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <h2 className="h5 fw-bold mb-3">Recently resolved</h2>
+      {resolved.length === 0 ? (
+        <p className="text-muted small">No cases have been resolved yet.</p>
+      ) : (
+        <div className="rx-card p-0">
+          <div className="table-responsive">
+            <table className="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Case</th>
+                  <th scope="col">Outcome</th>
+                  <th scope="col" className="text-end">
+                    Amount
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {resolved.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <Link to={`/analyst/cases/${item.id}`} className="text-decoration-none fw-semibold">
+                        {item.merchantName}
+                      </Link>
+                      <div className="text-muted small">{formatDate(item.createdAt)}</div>
+                    </td>
+                    <td>{item.latestRecommendation ? RECOMMENDED_OUTCOME_LABELS[item.latestRecommendation] : '—'}</td>
+                    <td className="text-end">
+                      <CurrencyDisplay amount={item.amount} currency={item.currency} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

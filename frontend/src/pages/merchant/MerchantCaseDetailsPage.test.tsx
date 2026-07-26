@@ -5,10 +5,22 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MerchantCaseDetailsPage } from './MerchantCaseDetailsPage';
 import * as merchantApi from '../../api/merchant';
 import * as evidenceApi from '../../api/evidence';
+import * as evaluationApi from '../../api/evaluation';
 import * as authApi from '../../api/auth';
 import { AuthProvider } from '../../auth/AuthContext';
+import { RealtimeProvider } from '../../realtime/RealtimeContext';
 import { ApiError } from '../../api/client';
 import type { DisputeCase, PolicyRequirement } from '../../types/domain';
+
+vi.mock('socket.io-client', () => ({
+  io: () => ({
+    on: vi.fn(),
+    off: vi.fn(),
+    emit: vi.fn(),
+    disconnect: vi.fn(),
+    io: { on: vi.fn(), off: vi.fn() },
+  }),
+}));
 
 const MERCHANT_USER = { id: 'merchant-1', name: 'Northstar Electronics', email: 'merchant@resolvex.demo', role: 'MERCHANT' as const };
 
@@ -78,10 +90,12 @@ function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/merchant/disputes/case-1']}>
       <AuthProvider>
-        <Routes>
-          <Route path="/merchant/disputes/:caseId" element={<MerchantCaseDetailsPage />} />
-          <Route path="/merchant/disputes" element={<div>Cases list page</div>} />
-        </Routes>
+        <RealtimeProvider>
+          <Routes>
+            <Route path="/merchant/disputes/:caseId" element={<MerchantCaseDetailsPage />} />
+            <Route path="/merchant/disputes" element={<div>Cases list page</div>} />
+          </Routes>
+        </RealtimeProvider>
       </AuthProvider>
     </MemoryRouter>,
   );
@@ -103,6 +117,9 @@ describe('MerchantCaseDetailsPage', () => {
     window.localStorage.setItem('resolvex.accessToken', 'test-token');
     vi.spyOn(merchantApi, 'getPolicyRequirements').mockResolvedValue(REQUIREMENTS);
     vi.spyOn(evidenceApi, 'listCaseEvidence').mockResolvedValue([]);
+    vi.spyOn(evaluationApi, 'getLatestEvaluation').mockRejectedValue(
+      new ApiError({ statusCode: 404, error: 'Not Found', message: 'Evaluation not found', timestamp: '', path: '' }),
+    );
   });
 
   it('renders transaction details, card-member statement, and the checklist from the API', async () => {

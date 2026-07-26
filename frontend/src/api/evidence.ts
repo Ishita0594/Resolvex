@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { apiClient } from './client';
-import type { EvidenceItem, EvidenceUploadTarget } from '../types/domain';
+import type { EvidenceItem, EvidenceUploadTarget, ExtractedFact } from '../types/domain';
 
 export interface CreateEvidenceUploadTargetPayload {
   evidenceType: string;
@@ -46,6 +46,38 @@ export async function listCaseEvidence(caseId: string): Promise<EvidenceItem[]> 
 
 export async function deleteEvidence(evidenceId: string): Promise<void> {
   await apiClient.delete(`/evidence/${evidenceId}`);
+}
+
+export async function getEvidence(evidenceId: string): Promise<EvidenceItem> {
+  const response = await apiClient.get<EvidenceItem>(`/evidence/${evidenceId}`);
+  return normalizeEvidenceItem(response.data);
+}
+
+export async function processEvidence(evidenceId: string): Promise<EvidenceItem> {
+  const response = await apiClient.post<EvidenceItem>(`/evidence/${evidenceId}/process`);
+  return normalizeEvidenceItem(response.data);
+}
+
+export async function retryEvidenceProcessing(evidenceId: string): Promise<EvidenceItem> {
+  const response = await apiClient.post<EvidenceItem>(`/evidence/${evidenceId}/retry`);
+  return normalizeEvidenceItem(response.data);
+}
+
+/** Replaces the full fact set for one evidence item; the backend deletes and recreates from this array, so unrelated facts must be passed through unchanged. */
+export async function replaceEvidenceFacts(evidenceId: string, facts: ExtractedFact[]): Promise<EvidenceItem> {
+  const response = await apiClient.patch<EvidenceItem>(`/evidence/${evidenceId}/facts`, {
+    facts: facts.map((fact) => ({
+      id: fact.id,
+      factType: fact.factType,
+      factValue: fact.factValue,
+      normalizedValue: fact.normalizedValue,
+      confidence: fact.confidence,
+      sourcePage: fact.sourcePage,
+      verifiedByUser: fact.verifiedByUser,
+      correctedByUser: fact.correctedByUser,
+    })),
+  });
+  return normalizeEvidenceItem(response.data);
 }
 
 export async function getEvidenceDownloadUrl(evidenceId: string): Promise<EvidenceDownloadTarget> {

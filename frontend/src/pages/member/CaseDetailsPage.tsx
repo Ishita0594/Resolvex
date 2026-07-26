@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { getDispute, getDisputeTimeline } from '../../api/disputes';
 import { listCaseEvidence } from '../../api/evidence';
@@ -8,17 +8,23 @@ import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { CaseTimeline } from '../../components/disputes/CaseTimeline';
+import { DecisionStatusCard } from '../../components/decision/DecisionStatusCard';
 import { EvidenceList } from '../../components/evidence/EvidenceList';
+import { EvidenceReviewView } from '../../components/evidence/EvidenceReviewView';
 import { EvidenceUploader } from '../../components/evidence/EvidenceUploader';
 import { CARD_MEMBER_EVIDENCE_TYPE_OPTIONS } from '../../constants/evidenceTypes';
+import { useCaseEvaluation } from '../../hooks/useCaseEvaluation';
+import { useCaseEvent } from '../../realtime/useCaseEvent';
+import { useRealtime } from '../../realtime/RealtimeContext';
 import { resolveApiError } from '../../utils/apiError';
 import { REASON_CODE_LABELS } from '../../types/domain';
-import type { DisputeCase, EvidenceItem, TimelineEvent } from '../../types/domain';
+import type { CaseEventPayload, DisputeCase, EvidenceItem, TimelineEvent } from '../../types/domain';
 import { formatDate } from '../../utils/format';
 
 export function CaseDetailsPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { user } = useAuth();
+  const { subscribeToCase } = useRealtime();
 
   const [dispute, setDispute] = useState<DisputeCase | null>(null);
   const [timeline, setTimeline] = useState<TimelineEvent[] | null>(null);
@@ -29,7 +35,10 @@ export function CaseDetailsPage() {
   const [isEvidenceLoading, setIsEvidenceLoading] = useState(true);
   const [evidenceError, setEvidenceError] = useState<{ message: string; variant: ErrorStateVariant } | null>(null);
 
-  function loadCase() {
+  const { evaluation, isLoading: isEvaluationLoading, error: evaluationError, reload: reloadEvaluation } =
+    useCaseEvaluation(caseId);
+
+  const loadCase = useCallback(() => {
     if (!caseId) {
       return;
     }
@@ -44,9 +53,9 @@ export function CaseDetailsPage() {
         setError(resolveApiError(err, 'Unable to load this case right now.'));
       })
       .finally(() => setIsLoading(false));
-  }
+  }, [caseId]);
 
-  function loadEvidence() {
+  const loadEvidence = useCallback(() => {
     if (!caseId) {
       return;
     }
@@ -58,13 +67,36 @@ export function CaseDetailsPage() {
         setEvidenceError(resolveApiError(err, 'Unable to load evidence for this case right now.'));
       })
       .finally(() => setIsEvidenceLoading(false));
-  }
+  }, [caseId]);
 
   useEffect(() => {
     loadCase();
     loadEvidence();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseId]);
+  }, [loadCase, loadEvidence]);
+
+  useEffect(() => {
+    if (caseId) {
+      subscribeToCase(caseId);
+    }
+  }, [caseId, subscribeToCase]);
+
+  const handleCaseEvent = useCallback(
+    (payload: CaseEventPayload) => {
+      if (payload.caseId !== caseId) {
+        return;
+      }
+      loadCase();
+      loadEvidence();
+      reloadEvaluation();
+    },
+    [caseId, loadCase, loadEvidence, reloadEvaluation],
+  );
+
+  useCaseEvent('case.status.updated', handleCaseEvent);
+  useCaseEvent('evidence.processing.completed', handleCaseEvent);
+  useCaseEvent('decision.generated', handleCaseEvent);
+  useCaseEvent('analyst.review.required', handleCaseEvent);
+  useCaseEvent('information.requested', handleCaseEvent);
 
   if (isLoading) {
     return <LoadingSkeleton variant="card" rows={6} label="Loading case" />;
@@ -169,18 +201,37 @@ export function CaseDetailsPage() {
             </div>
           </div>
 
-          <div className="rx-card p-4 mb-4 rx-card--placeholder">
-            <h2 className="h6 text-uppercase text-muted mb-2" style={{ letterSpacing: '0.06em' }}>
+          <div className="rx-card p-4 mb-4">
+            <h2 className="h6 text-uppercase text-muted mb-3" style={{ letterSpacing: '0.06em' }}>
               Extracted facts
             </h2>
-            <p className="text-muted mb-0 small">AI-extracted facts from submitted evidence will be available for review in a later phase.</p>
+            {user ? (
+              <EvidenceReviewView
+                evidence={evidence}
+                isLoading={isEvidenceLoading}
+                error={evidenceError}
+                onRetryLoad={loadEvidence}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+                onEvidenceUpdated={(updated) =>
+                  setEvidence((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+                }
+              />
+            ) : null}
           </div>
 
-          <div className="rx-card p-4 rx-card--placeholder">
-            <h2 className="h6 text-uppercase text-muted mb-2" style={{ letterSpacing: '0.06em' }}>
+          <div className="rx-card p-4">
+            <h2 className="h6 text-uppercase text-muted mb-3" style={{ letterSpacing: '0.06em' }}>
               Decision &amp; explanation
             </h2>
-            <p className="text-muted mb-0 small">The policy engine&apos;s decision and explanation will appear here in a later phase.</p>
+            <DecisionStatusCard
+              caseStatus={dispute.status}
+              evaluation={evaluation}
+              isLoading={isEvaluationLoading}
+              error={evaluationError}
+              onRetryLoad={reloadEvaluation}
+              explanationPath={`/member/disputes/${dispute.id}/decision`}
+            />
           </div>
         </div>
 

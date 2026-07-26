@@ -49,6 +49,17 @@ export class AnalystController {
     return this.analystReviewService.listQueue();
   }
 
+  @Get('resolved')
+  @ApiOperation({ summary: 'List recently resolved cases' })
+  @ApiOkResponse({ description: 'Recently resolved cases' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid bearer token' })
+  @ApiForbiddenResponse({
+    description: 'Only analysts can access analyst cases',
+  })
+  listResolved() {
+    return this.analystReviewService.listRecentlyResolved();
+  }
+
   @Get(':caseId')
   @ApiOperation({ summary: 'Get one analyst-review case' })
   @ApiOkResponse({ description: 'Analyst case details' })

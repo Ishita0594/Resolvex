@@ -443,3 +443,138 @@ body {
 .rx-confidence-fill--high { background: var(--rx-status-resolved); }
 .rx-confidence-fill--medium { background: var(--rx-status-processing); }
 .rx-confidence-fill--low { background: var(--rx-status-failed); }
+
+/* -------------------------------------------------- */
+/* Toasts                                              */
+/* -------------------------------------------------- */
+
+.rx-toast-stack {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1080;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: min(340px, calc(100vw - 2.5rem));
+  pointer-events: none;
+}
+
+.rx-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  background: var(--rx-white);
+  border: 1px solid var(--rx-gray-200);
+  border-left: 4px solid var(--rx-blue-600);
+  border-radius: var(--rx-radius-sm);
+  box-shadow: var(--rx-shadow-md);
+  padding: 0.75rem 0.85rem;
+  pointer-events: auto;
+  animation: rx-toast-in 0.18s ease;
+}
+
+.rx-toast--success { border-left-color: var(--rx-status-resolved); }
+.rx-toast--warning { border-left-color: var(--rx-status-review); }
+
+@keyframes rx-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* -------------------------------------------------- */
+/* Notification dropdown                               */
+/* -------------------------------------------------- */
+
+.rx-notification-menu {
+  position: relative;
+}
+
+.rx-notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--rx-status-failed);
+  color: var(--rx-white);
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
+}
+
+.rx-notification-panel {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  width: 340px;
+  max-width: calc(100vw - 2rem);
+  background: var(--rx-white);
+  color: var(--rx-gray-900);
+  border: 1px solid var(--rx-gray-200);
+  border-radius: var(--rx-radius-md);
+  box-shadow: var(--rx-shadow-lg);
+  overflow: hidden;
+  z-index: 30;
+}
+
+.rx-notification-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.rx-notification-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--rx-gray-100);
+  padding: 0.65rem 0.9rem;
+  cursor: pointer;
+}
+
+.rx-notification-item:last-child {
+  border-bottom: none;
+}
+
+.rx-notification-item:hover {
+  background: var(--rx-gray-50);
+}
+
+.rx-notification-item--unread {
+  background: var(--rx-blue-100);
+}
+
+.rx-notification-item--unread:hover {
+  background: #d9ebfb;
+}
+
+/* -------------------------------------------------- */
+/* Realtime connection status                           */
+/* -------------------------------------------------- */
+
+.rx-realtime-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem;
+}
+
+.rx-realtime-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.rx-realtime-dot--open { background: var(--rx-status-resolved); }
+.rx-realtime-dot--connecting { background: var(--rx-status-processing); animation: rx-realtime-pulse 1.2s ease infinite; }
+.rx-realtime-dot--closed { background: var(--rx-status-failed); }
+
+@keyframes rx-realtime-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

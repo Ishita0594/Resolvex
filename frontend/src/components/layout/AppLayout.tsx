@@ -1,7 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ROLE_LABELS } from '../../auth/roles';
+import { NotificationDropdown } from '../notifications/NotificationDropdown';
 import type { UserRole } from '../../types/domain';
+import { RealtimeStatusIndicator } from './RealtimeStatusIndicator';
 
 interface NavItem {
   to: string;
@@ -19,7 +21,8 @@ const NAV_ITEMS_BY_ROLE: Record<UserRole, NavItem[]> = {
     { to: '/merchant/disputes', label: 'Assigned Cases', icon: 'bi-clipboard-data' },
   ],
   ANALYST: [
-    { to: '/analyst/dashboard', label: 'Review Queue', icon: 'bi-clipboard-check' },
+    { to: '/analyst/dashboard', label: 'Dashboard', icon: 'bi-speedometer2' },
+    { to: '/analyst/queue', label: 'Review Queue', icon: 'bi-clipboard-check' },
   ],
 };
 
@@ -40,6 +43,8 @@ export function AppLayout() {
           <span className="fw-bold">ResolveX</span>
         </div>
         <div className="d-flex align-items-center gap-3">
+          <RealtimeStatusIndicator />
+          <NotificationDropdown />
           <span className="rx-role-badge">
             <i className="bi bi-person-badge" aria-hidden="true" />
             {ROLE_LABELS[user.role]}

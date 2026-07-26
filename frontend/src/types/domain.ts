@@ -155,6 +155,11 @@ export interface EvidenceUploadTarget {
   expiresAt: string;
 }
 
+export interface PolicyRuleDescriptor {
+  ruleId: string;
+  description?: string;
+}
+
 export interface DecisionRecord {
   id: string;
   caseId: string;
@@ -168,22 +173,145 @@ export interface DecisionRecord {
   modelMetadata: {
     aiDecisionUsed: boolean;
     deterministicPolicyEngine: boolean;
+    policyVersion?: string;
+    qualityWeights?: Record<string, number>;
+    prototypeAssumptions?: PolicyRuleDescriptor[];
   };
   explanationData: ExplanationData;
   createdAt: string;
 }
 
+export type EvidenceSupportDirection = 'SUPPORTS_CARD_MEMBER' | 'SUPPORTS_MERCHANT' | 'NEUTRAL' | 'CONTRADICTORY';
+
+export interface ExplanationContradiction {
+  factType: string;
+  severity: 'LOW' | 'HIGH';
+  values: string[];
+  evidenceIds: string[];
+  description: string;
+}
+
+export interface ExplanationEvidenceSummary {
+  evidenceId: string;
+  evidenceType: string;
+  finalScore?: number;
+}
+
+export interface ExplanationVerifiedFact {
+  factType: string;
+  value: string;
+  evidenceId: string;
+}
+
 export interface ExplanationData {
   disputeCategory: ReasonCode;
+  whatNeededToBeProven: string[];
+  evidenceSubmittedByEachParty: {
+    cardMember: ExplanationEvidenceSummary[];
+    merchant: ExplanationEvidenceSummary[];
+  };
+  verifiedFacts: ExplanationVerifiedFact[];
+  missingEvidence: string[];
+  contradictions: ExplanationContradiction[];
   appliedRuleIdentifiers: string[];
   recommendedOutcome: RecommendedOutcome;
   confidence: number;
   humanReviewReason: string | null;
-  [key: string]: unknown;
 }
 
-export interface AnalystCaseSummary extends DisputeCase {
-  latestDecision?: DecisionRecord | null;
+export interface EvidenceMatrixScore {
+  caseId: string;
+  evidenceId: string;
+  requirementId: string;
+  sourceReliability: number;
+  directness: number;
+  completeness: number;
+  consistency: number;
+  timeliness: number;
+  finalScore: number;
+  supportDirection: EvidenceSupportDirection;
+  evidenceType: string;
+  submittedByRole: UserRole;
+}
+
+export interface EvidenceMatrixRequirement {
+  requirementId: string;
+  requirementKey: string;
+  requirementName: string;
+  isMandatory: boolean;
+  evaluated: boolean;
+  evidenceScores: EvidenceMatrixScore[];
+}
+
+export interface EvidenceMatrixResponse {
+  caseId: string;
+  policyVersion: string;
+  disputeCategory: ReasonCode;
+  requirements: EvidenceMatrixRequirement[];
+}
+
+export interface AnalystQueueCase {
+  id: string;
+  reasonCode: ReasonCode;
+  status: CaseStatus;
+  cardMemberId: string;
+  merchantId: string;
+  merchantName: string;
+  amount: string;
+  currency: string;
+  latestRecommendation: RecommendedOutcome | null;
+  latestConfidence: number | null;
+  latestDecisionMargin: number | null;
+  /** Plain-language reasons the policy engine could not decide automatically (semicolon-joined by the backend), or null once/if resolved without escalation. */
+  latestEscalationReason: string | null;
+  responseDeadline: string;
+  createdAt: string;
+}
+
+export interface AnalystReviewEntry {
+  id: string;
+  analystId: string;
+  systemRecommendation: RecommendedOutcome;
+  analystDecision: AnalystDecision;
+  overrideReason: string | null;
+  analystNotes: string | null;
+  createdAt: string;
+}
+
+export interface AnalystCaseDetail extends AnalystQueueCase {
+  cardMemberStatement: string;
+  merchantStatement: string | null;
+  latestExplanation: ExplanationData | null;
+  reviews: AnalystReviewEntry[];
+}
+
+export interface AnalystDecisionPayload {
+  decision: AnalystDecision;
+  overrideReason?: string;
+  analystNotes?: string;
+}
+
+export interface AnalystDecisionResult {
+  reviewId: string;
+  caseId: string;
+  systemRecommendation: RecommendedOutcome;
+  analystDecision: AnalystDecision;
+  status: CaseStatus;
+  overrideReason: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  caseId: string | null;
+  userId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  previousValue: unknown;
+  newValue: unknown;
+  ipAddress: string | null;
+  createdAt: string;
 }
 
 export interface Notification {
@@ -192,9 +320,25 @@ export interface Notification {
   caseId: string | null;
   title: string;
   message: string;
-  notificationType: string;
+  type: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export type CaseEventName =
+  | 'case.status.updated'
+  | 'evidence.processing.completed'
+  | 'merchant.response.received'
+  | 'analyst.review.required'
+  | 'decision.generated'
+  | 'information.requested';
+
+export interface CaseEventPayload {
+  caseId: string;
+  newStatus?: CaseStatus;
+  title?: string;
+  message?: string;
+  metadata?: Record<string, string | number | boolean | null>;
 }
 
 export interface ApiErrorBody {
@@ -236,4 +380,23 @@ export const EVIDENCE_PROCESSING_STATUS_LABELS: Record<EvidenceProcessingStatus,
   PROCESSED: 'Processed',
   FAILED: 'Failed',
   VERIFIED: 'Verified',
+};
+
+/** Deliberately neutral: avoids "won/lost" framing so an automated recommendation doesn't read as a final verdict. */
+export const RECOMMENDED_OUTCOME_LABELS: Record<RecommendedOutcome, string> = {
+  CARD_MEMBER_SUPPORTED: 'Evidence weighed toward the card member',
+  MERCHANT_SUPPORTED: 'Evidence weighed toward the merchant',
+  HUMAN_REVIEW_REQUIRED: 'Needs human review',
+};
+
+export const DECISION_TYPE_LABELS: Record<DecisionType, string> = {
+  AUTOMATED_RECOMMENDATION: 'Automated recommendation',
+  HUMAN_DECISION: 'Human decision',
+};
+
+export const ANALYST_DECISION_LABELS: Record<AnalystDecision, string> = {
+  SUPPORT_CARD_MEMBER: 'Support card member',
+  SUPPORT_MERCHANT: 'Support merchant',
+  REQUEST_MORE_INFORMATION: 'Request more information',
+  ESCALATE: 'Escalate',
 };

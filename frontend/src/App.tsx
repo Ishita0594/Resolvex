@@ -4,6 +4,9 @@ import { ProtectedRoute } from './auth/ProtectedRoute';
 import { RoleRoute } from './auth/RoleRoute';
 import { DASHBOARD_PATH_BY_ROLE } from './auth/roles';
 import { AppLayout } from './components/layout/AppLayout';
+import { ToastProvider } from './components/common/ToastProvider';
+import { NotificationsProvider } from './notifications/NotificationsContext';
+import { RealtimeProvider } from './realtime/RealtimeContext';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { CardMemberDashboard } from './pages/member/CardMemberDashboard';
@@ -15,6 +18,9 @@ import { MerchantDashboard } from './pages/merchant/MerchantDashboard';
 import { MerchantCasesPage } from './pages/merchant/MerchantCasesPage';
 import { MerchantCaseDetailsPage } from './pages/merchant/MerchantCaseDetailsPage';
 import { AnalystDashboard } from './pages/analyst/AnalystDashboard';
+import { AnalystQueuePage } from './pages/analyst/AnalystQueuePage';
+import { AnalystCasePage } from './pages/analyst/AnalystCasePage';
+import { DecisionExplanationPage } from './pages/shared/DecisionExplanationPage';
 import { NotFoundPage } from './pages/misc/NotFoundPage';
 import { UnauthorizedPage } from './pages/misc/UnauthorizedPage';
 import { SessionExpiredModal } from './components/common/SessionExpiredModal';
@@ -49,14 +55,18 @@ function AppRoutes() {
             <Route path="/member/transactions/:transactionId/dispute" element={<CreateDisputePage />} />
             <Route path="/member/disputes" element={<MemberCasesPage />} />
             <Route path="/member/disputes/:caseId" element={<CaseDetailsPage />} />
+            <Route path="/member/disputes/:caseId/decision" element={<DecisionExplanationPage />} />
           </Route>
           <Route element={<RoleRoute allow={['MERCHANT']} />}>
             <Route path="/merchant/dashboard" element={<MerchantDashboard />} />
             <Route path="/merchant/disputes" element={<MerchantCasesPage />} />
             <Route path="/merchant/disputes/:caseId" element={<MerchantCaseDetailsPage />} />
+            <Route path="/merchant/disputes/:caseId/decision" element={<DecisionExplanationPage />} />
           </Route>
           <Route element={<RoleRoute allow={['ANALYST']} />}>
             <Route path="/analyst/dashboard" element={<AnalystDashboard />} />
+            <Route path="/analyst/queue" element={<AnalystQueuePage />} />
+            <Route path="/analyst/cases/:caseId" element={<AnalystCasePage />} />
           </Route>
         </Route>
       </Route>
@@ -69,8 +79,14 @@ function AppRoutes() {
 export function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
-      <SessionExpiredModal />
+      <ToastProvider>
+        <RealtimeProvider>
+          <NotificationsProvider>
+            <AppRoutes />
+            <SessionExpiredModal />
+          </NotificationsProvider>
+        </RealtimeProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }
