@@ -22,3 +22,11 @@ Use only synthetic data for demos.
 - Merchant provides cancellation policy and service fulfillment evidence.
 - Policy engine evaluates cancellation timing, policy terms, and service usage evidence.
 - Ambiguous terms or incomplete documents route the case to `HUMAN_REVIEW`.
+
+## Phase 9 Stable Backend Scenarios
+These scenarios are seeded by `npm run prisma:seed` and restored by `npm run reset-demo-data`.
+
+- Scenario A: `91000000-0000-4000-8000-000000000001`, goods not received, invoice and dispatch exist, no delivery confirmation, consistent non-delivery evidence. Expected recommendation: card member supported.
+- Scenario B: `91000000-0000-4000-8000-000000000002`, goods not received claim with signed delivery confirmation, matching recipient, and matching delivery location. Expected recommendation: merchant supported.
+- Scenario C: `91000000-0000-4000-8000-000000000003`, delivery location conflicts with recipient evidence and confidence is below threshold. Expected recommendation: human review.
+- Scenario D: `91000000-0000-4000-8000-000000000004`, refund promised but no completed refund transaction exists. Expected recommendation: card member supported.

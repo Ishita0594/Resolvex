@@ -41,3 +41,4 @@ backend/prisma/dev.db
 .env.*
 .env
 .env.*
+backend/storage/
