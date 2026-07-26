@@ -1,15 +1,14 @@
 import axios, { AxiosError } from 'axios';
 import { clearStoredToken, getStoredToken } from '../auth/tokenStorage';
+import { API_BASE_URL } from '../config/env';
 import type { ApiErrorBody } from '../types/domain';
 
 export const SESSION_EXPIRED_EVENT = 'resolvex:session-expired';
 export const API_UNAVAILABLE_EVENT = 'resolvex:api-unavailable';
 export const API_AVAILABLE_EVENT = 'resolvex:api-available';
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api';
-
 export const apiClient = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   timeout: 20000,
 });
 

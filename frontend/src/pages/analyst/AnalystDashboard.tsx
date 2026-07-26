@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listAnalystQueue, listRecentlyResolvedCases } from '../../api/analyst';
 import { useAuth } from '../../auth/AuthContext';
-import { StatTile } from '../../components/analyst/StatTile';
+import { StatTile } from '../../components/common/StatTile';
 import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
+import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { useCaseEvent } from '../../realtime/useCaseEvent';
+import { useIsMobileViewport } from '../../hooks/useMediaQuery';
 import { REASON_CODE_LABELS, RECOMMENDED_OUTCOME_LABELS } from '../../types/domain';
 import type { AnalystQueueCase } from '../../types/domain';
 import { ageInDays, getAnalystPriority, isApproachingDeadline, isDeadlinePassed } from '../../utils/analystQueue';
@@ -15,6 +17,7 @@ import { formatDate } from '../../utils/format';
 
 export function AnalystDashboard() {
   const { user } = useAuth();
+  const isMobile = useIsMobileViewport();
   const [queue, setQueue] = useState<AnalystQueueCase[] | null>(null);
   const [resolved, setResolved] = useState<AnalystQueueCase[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,24 +69,16 @@ export function AnalystDashboard() {
       <p className="text-muted mb-4">Here&apos;s what needs attention across the review queue.</p>
 
       <div className="row g-3 mb-4">
-        <div className="col-sm-6 col-lg-3">
-          <StatTile icon="bi-inbox" label="Awaiting review" value={String(queue.length)} tone="submitted" />
-        </div>
-        <div className="col-sm-6 col-lg-3">
-          <StatTile icon="bi-exclamation-triangle" label="High priority" value={String(highPriorityCount)} tone="review" />
-        </div>
-        <div className="col-sm-6 col-lg-3">
-          <StatTile
-            icon="bi-hourglass-split"
-            label="Approaching deadline"
-            value={String(approachingDeadlineCount)}
-            caption="Within 2 days or past due"
-            tone="processing"
-          />
-        </div>
-        <div className="col-sm-6 col-lg-3">
-          <StatTile icon="bi-bar-chart" label="Average confidence" value={averageConfidence === null ? '—' : `${averageConfidence}%`} />
-        </div>
+        <StatTile icon="bi-inbox" label="Awaiting review" value={queue.length} tone="submitted" />
+        <StatTile icon="bi-exclamation-triangle" label="High priority" value={highPriorityCount} tone="review" />
+        <StatTile
+          icon="bi-hourglass-split"
+          label="Approaching deadline"
+          value={approachingDeadlineCount}
+          caption="Within 2 days or past due"
+          tone="processing"
+        />
+        <StatTile icon="bi-bar-chart" label="Average confidence" value={averageConfidence === null ? '—' : `${averageConfidence}%`} />
       </div>
 
       <div className="d-flex align-items-center justify-content-between mb-3">
@@ -94,10 +89,45 @@ export function AnalystDashboard() {
       </div>
 
       {queue.length === 0 ? (
-        <div className="rx-card p-5 text-center mb-4">
-          <i className="bi bi-clipboard-check text-primary" style={{ fontSize: '2rem' }} aria-hidden="true" />
-          <h3 className="h5 mt-3 mb-1">Nothing needs review right now</h3>
-          <p className="text-muted mb-0">New cases will appear here as soon as the policy engine escalates them.</p>
+        <div className="mb-4">
+          <EmptyState
+            icon="bi-clipboard-check"
+            title="Nothing needs review right now"
+            description="New cases will appear here as soon as the policy engine escalates them."
+          />
+        </div>
+      ) : isMobile ? (
+        <div className="rx-card p-3 mb-4">
+          {queue.slice(0, 5).map((item) => (
+            <div key={item.id} className="rx-table-card">
+              <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                <Link to={`/analyst/cases/${item.id}`} className="text-decoration-none fw-semibold">
+                  {item.merchantName}
+                </Link>
+                {getAnalystPriority(item) === 'HIGH' ? (
+                  <span className="rx-badge rx-badge--review">High</span>
+                ) : (
+                  <span className="rx-badge rx-badge--neutral">Standard</span>
+                )}
+              </div>
+              <dl className="mb-0">
+                <div className="rx-table-card-row">
+                  <dt>Category</dt>
+                  <dd>{REASON_CODE_LABELS[item.reasonCode]}</dd>
+                </div>
+                <div className="rx-table-card-row">
+                  <dt>Amount</dt>
+                  <dd>
+                    <CurrencyDisplay amount={item.amount} currency={item.currency} />
+                  </dd>
+                </div>
+                <div className="rx-table-card-row">
+                  <dt>Age</dt>
+                  <dd>{ageInDays(item.createdAt)}d</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
         </div>
       ) : (
         <div className="rx-card p-0 mb-4">
@@ -144,7 +174,30 @@ export function AnalystDashboard() {
 
       <h2 className="h5 fw-bold mb-3">Recently resolved</h2>
       {resolved.length === 0 ? (
-        <p className="text-muted small">No cases have been resolved yet.</p>
+        <EmptyState icon="bi-check2-circle" title="No cases have been resolved yet." />
+      ) : isMobile ? (
+        <div className="rx-card p-3">
+          {resolved.map((item) => (
+            <div key={item.id} className="rx-table-card">
+              <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                <Link to={`/analyst/cases/${item.id}`} className="text-decoration-none fw-semibold">
+                  {item.merchantName}
+                </Link>
+                <CurrencyDisplay amount={item.amount} currency={item.currency} />
+              </div>
+              <dl className="mb-0">
+                <div className="rx-table-card-row">
+                  <dt>Outcome</dt>
+                  <dd>{item.latestRecommendation ? RECOMMENDED_OUTCOME_LABELS[item.latestRecommendation] : '—'}</dd>
+                </div>
+                <div className="rx-table-card-row">
+                  <dt>Resolved</dt>
+                  <dd>{formatDate(item.createdAt)}</dd>
+                </div>
+              </dl>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="rx-card p-0">
           <div className="table-responsive">

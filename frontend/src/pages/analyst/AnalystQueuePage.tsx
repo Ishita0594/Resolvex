@@ -6,6 +6,7 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { useCaseEvent } from '../../realtime/useCaseEvent';
+import { useIsMobileViewport } from '../../hooks/useMediaQuery';
 import { REASON_CODE_LABELS, RECOMMENDED_OUTCOME_LABELS } from '../../types/domain';
 import type { AnalystQueueCase, ReasonCode } from '../../types/domain';
 import { ageInDays, getAnalystPriority, isDeadlinePassed, type AnalystPriority } from '../../utils/analystQueue';
@@ -42,6 +43,7 @@ function firstEscalationReason(reason: string | null): string | null {
 }
 
 export function AnalystQueuePage() {
+  const isMobile = useIsMobileViewport();
   const [cases, setCases] = useState<AnalystQueueCase[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<{ message: string; variant: ErrorStateVariant } | null>(null);
@@ -158,6 +160,63 @@ export function AnalystQueuePage() {
         <EmptyState icon="bi-clipboard-check" title="Nothing needs review right now" description="New cases will appear here as soon as the policy engine escalates them." />
       ) : visibleCases.length === 0 ? (
         <EmptyState icon="bi-funnel" title="No cases match these filters" description="Try a different priority or dispute category." />
+      ) : isMobile ? (
+        <div className="rx-card p-3">
+          {visibleCases.map((item) => {
+            const priority = getAnalystPriority(item);
+            const escalationReason = firstEscalationReason(item.latestEscalationReason);
+            return (
+              <div key={item.id} className="rx-table-card">
+                <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                  <Link to={`/analyst/cases/${item.id}`} className="text-decoration-none fw-semibold">
+                    {item.merchantName}
+                  </Link>
+                  {priority === 'HIGH' ? (
+                    <span className="rx-badge rx-badge--review">High</span>
+                  ) : (
+                    <span className="rx-badge rx-badge--neutral">Standard</span>
+                  )}
+                </div>
+                <dl className="mb-0">
+                  <div className="rx-table-card-row">
+                    <dt>Category</dt>
+                    <dd>{REASON_CODE_LABELS[item.reasonCode]}</dd>
+                  </div>
+                  <div className="rx-table-card-row">
+                    <dt>Amount</dt>
+                    <dd>
+                      <CurrencyDisplay amount={item.amount} currency={item.currency} />
+                    </dd>
+                  </div>
+                  <div className="rx-table-card-row">
+                    <dt>Recommendation</dt>
+                    <dd>{item.latestRecommendation ? RECOMMENDED_OUTCOME_LABELS[item.latestRecommendation] : 'Not yet evaluated'}</dd>
+                  </div>
+                  <div className="rx-table-card-row">
+                    <dt>Confidence</dt>
+                    <dd>{item.latestConfidence !== null ? `${Math.round(item.latestConfidence)}%` : '—'}</dd>
+                  </div>
+                  {escalationReason ? (
+                    <div className="rx-table-card-row">
+                      <dt>Escalation</dt>
+                      <dd title={item.latestEscalationReason ?? undefined}>{escalationReason}</dd>
+                    </div>
+                  ) : null}
+                  <div className="rx-table-card-row">
+                    <dt>Age</dt>
+                    <dd>{ageInDays(item.createdAt)}d</dd>
+                  </div>
+                  <div className="rx-table-card-row">
+                    <dt>Deadline</dt>
+                    <dd className={isDeadlinePassed(item.responseDeadline) ? 'text-danger' : ''}>
+                      {formatCountdown(item.responseDeadline)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="rx-card p-0">
           <div className="table-responsive">

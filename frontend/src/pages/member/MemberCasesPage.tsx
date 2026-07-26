@@ -6,6 +6,7 @@ import { CurrencyDisplay } from '../../components/common/CurrencyDisplay';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { useIsMobileViewport } from '../../hooks/useMediaQuery';
 import { resolveApiError } from '../../utils/apiError';
 import { formatDate } from '../../utils/format';
 import type { CaseStatus, DisputeCase, ReasonCode } from '../../types/domain';
@@ -15,6 +16,7 @@ const STATUS_OPTIONS = Object.keys(CASE_STATUS_LABELS) as CaseStatus[];
 const REASON_OPTIONS = Object.keys(REASON_CODE_LABELS) as ReasonCode[];
 
 export function MemberCasesPage() {
+  const isMobile = useIsMobileViewport();
   const [disputes, setDisputes] = useState<DisputeCase[] | null>(null);
   const [error, setError] = useState<{ message: string; variant: ErrorStateVariant } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,44 +135,76 @@ export function MemberCasesPage() {
       ) : null}
 
       {!isLoading && !error && filteredDisputes.length > 0 ? (
-        <div className="rx-card p-0">
-          <div className="table-responsive">
-            <table className="table align-middle mb-0">
-              <thead>
-                <tr>
-                  <th scope="col">Merchant</th>
-                  <th scope="col">Reason</th>
-                  <th scope="col">Amount</th>
-                  <th scope="col">Submitted</th>
-                  <th scope="col">Status</th>
-                  <th scope="col" className="text-end">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDisputes.map((dispute) => (
-                  <tr key={dispute.id}>
-                    <td className="fw-semibold">{dispute.transaction.merchantName}</td>
-                    <td>{REASON_CODE_LABELS[dispute.reasonCode]}</td>
-                    <td>
+        isMobile ? (
+          <div className="rx-card p-3">
+            {filteredDisputes.map((dispute) => (
+              <div key={dispute.id} className="rx-table-card">
+                <div className="d-flex align-items-center justify-content-between gap-2 flex-wrap mb-2">
+                  <span className="fw-semibold">{dispute.transaction.merchantName}</span>
+                  <CaseStatusBadge status={dispute.status} />
+                </div>
+                <dl className="mb-0">
+                  <div className="rx-table-card-row">
+                    <dt>Reason</dt>
+                    <dd>{REASON_CODE_LABELS[dispute.reasonCode]}</dd>
+                  </div>
+                  <div className="rx-table-card-row">
+                    <dt>Amount</dt>
+                    <dd>
                       <CurrencyDisplay amount={dispute.transaction.amount} currency={dispute.transaction.currency} />
-                    </td>
-                    <td>{formatDate(dispute.createdAt)}</td>
-                    <td>
-                      <CaseStatusBadge status={dispute.status} />
-                    </td>
-                    <td className="text-end">
-                      <Link to={`/member/disputes/${dispute.id}`} className="btn btn-sm btn-outline-primary">
-                        View case
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </dd>
+                  </div>
+                  <div className="rx-table-card-row">
+                    <dt>Submitted</dt>
+                    <dd>{formatDate(dispute.createdAt)}</dd>
+                  </div>
+                </dl>
+                <Link to={`/member/disputes/${dispute.id}`} className="btn btn-sm btn-outline-primary w-100 mt-3">
+                  View case
+                </Link>
+              </div>
+            ))}
           </div>
-        </div>
+        ) : (
+          <div className="rx-card p-0">
+            <div className="table-responsive">
+              <table className="table align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">Merchant</th>
+                    <th scope="col">Reason</th>
+                    <th scope="col">Amount</th>
+                    <th scope="col">Submitted</th>
+                    <th scope="col">Status</th>
+                    <th scope="col" className="text-end">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDisputes.map((dispute) => (
+                    <tr key={dispute.id}>
+                      <td className="fw-semibold">{dispute.transaction.merchantName}</td>
+                      <td>{REASON_CODE_LABELS[dispute.reasonCode]}</td>
+                      <td>
+                        <CurrencyDisplay amount={dispute.transaction.amount} currency={dispute.transaction.currency} />
+                      </td>
+                      <td>{formatDate(dispute.createdAt)}</td>
+                      <td>
+                        <CaseStatusBadge status={dispute.status} />
+                      </td>
+                      <td className="text-end">
+                        <Link to={`/member/disputes/${dispute.id}`} className="btn btn-sm btn-outline-primary">
+                          View case
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
       ) : null}
     </div>
   );

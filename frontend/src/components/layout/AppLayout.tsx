@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { ROLE_LABELS } from '../../auth/roles';
+import { APP_NAME, DEMO_MODE_LABEL } from '../../config/env';
 import { NotificationDropdown } from '../notifications/NotificationDropdown';
 import type { UserRole } from '../../types/domain';
 import { RealtimeStatusIndicator } from './RealtimeStatusIndicator';
@@ -57,7 +58,8 @@ export function AppLayout() {
           <span className="rx-brand-mark-icon" style={{ width: 28, height: 28, fontSize: '0.85rem' }}>
             RX
           </span>
-          <span className="fw-bold">ResolveX</span>
+          <span className="fw-bold">{APP_NAME}</span>
+          {DEMO_MODE_LABEL ? <span className="rx-demo-badge">{DEMO_MODE_LABEL}</span> : null}
         </div>
         <div className="d-flex align-items-center gap-3">
           <RealtimeStatusIndicator />
@@ -100,7 +102,9 @@ export function AppLayout() {
         </nav>
 
         <main className="rx-main flex-grow-1">
-          <Outlet />
+          <div key={location.pathname} className="rx-page-transition">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

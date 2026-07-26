@@ -62,6 +62,18 @@ body {
 /* Buttons                                             */
 /* -------------------------------------------------- */
 
+.btn {
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+a {
+  transition: color 0.15s ease;
+}
+
 .btn-primary {
   --bs-btn-bg: var(--rx-blue-600);
   --bs-btn-border-color: var(--rx-blue-600);
@@ -335,6 +347,19 @@ body {
   z-index: 20;
 }
 
+.rx-demo-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--rx-gold-400), var(--rx-gold-500));
+  color: var(--rx-navy-950);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .rx-role-badge {
   display: inline-flex;
   align-items: center;
@@ -382,6 +407,21 @@ body {
 .rx-main {
   flex: 1;
   padding: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.rx-page-transition {
+  animation: rx-page-fade-in 0.2s ease;
+}
+
+@keyframes rx-page-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rx-page-transition {
+    animation: none;
+  }
 }
 
 /* -------------------------------------------------- */
@@ -645,6 +685,26 @@ body {
   .rx-main {
     padding: 1rem;
   }
+
+  .rx-auth-shell {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .rx-auth-brand {
+    flex: 0 0 auto;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .rx-auth-quote,
+  .rx-auth-stats {
+    display: none;
+  }
+
+  .rx-auth-form {
+    flex: 1 1 auto;
+    padding: 1.5rem;
+  }
 }
 
 @media (max-width: 575.98px) {
@@ -690,4 +750,113 @@ body {
 .rx-table-card-row dd {
   margin: 0;
   text-align: right;
+}
+
+/* -------------------------------------------------- */
+/* Stat tiles                                          */
+/* -------------------------------------------------- */
+
+/* -------------------------------------------------- */
+/* Landing page                                        */
+/* -------------------------------------------------- */
+
+.rx-landing-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem clamp(1.25rem, 5vw, 4rem);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(5, 14, 36, 0.92);
+  backdrop-filter: blur(6px);
+  color: var(--rx-white);
+}
+
+.rx-landing-hero {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(120% 120% at 15% 0%, var(--rx-navy-700) 0%, var(--rx-navy-900) 45%, var(--rx-navy-950) 100%);
+  color: var(--rx-white);
+  padding: clamp(2.5rem, 6vw, 5.5rem) clamp(1.25rem, 5vw, 4rem);
+}
+
+.rx-landing-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(135deg, rgba(201, 162, 39, 0.14) 0%, transparent 45%),
+    repeating-linear-gradient(120deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 64px);
+  pointer-events: none;
+}
+
+.rx-landing-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.rx-landing-section {
+  padding: clamp(2.5rem, 5vw, 4rem) clamp(1.25rem, 5vw, 4rem);
+}
+
+.rx-landing-callout {
+  background: var(--rx-blue-100);
+  border: 1px solid var(--rx-blue-500);
+  border-radius: var(--rx-radius-md);
+  padding: 1.25rem 1.5rem;
+}
+
+.rx-workflow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  counter-reset: rx-workflow-step;
+}
+
+.rx-workflow-step {
+  flex: 1 1 180px;
+  position: relative;
+  background: var(--rx-white);
+  border: 1px solid var(--rx-gray-200);
+  border-radius: var(--rx-radius-md);
+  padding: 1.25rem 1rem 1rem;
+  text-align: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rx-workflow-step:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--rx-shadow-md);
+}
+
+.rx-workflow-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--rx-blue-600);
+  color: var(--rx-white);
+  font-weight: 700;
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+}
+
+.rx-landing-footer {
+  padding: 1.5rem clamp(1.25rem, 5vw, 4rem);
+  border-top: 1px solid var(--rx-gray-200);
+  color: var(--rx-gray-500);
+}
+
+.rx-stat-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.1rem;
 }

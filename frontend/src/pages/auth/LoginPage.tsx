@@ -2,17 +2,15 @@ import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate, type Location } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { DASHBOARD_PATH_BY_ROLE } from '../../auth/roles';
+import { APP_NAME } from '../../config/env';
 import { ErrorAlert } from '../../components/common/ErrorAlert';
 import { AuthBrandPanel } from './AuthBrandPanel';
+import { DemoAccountsPanel } from './DemoAccountsPanel';
 import { submitErrorMessage } from '../../utils/apiError';
 import { isValidEmail } from '../../utils/validation';
-import type { UserRole } from '../../types/domain';
 
-const DEMO_ACCOUNTS: { role: UserRole; label: string; email: string }[] = [
-  { role: 'CARD_MEMBER', label: 'Card Member', email: 'member@resolvex.demo' },
-  { role: 'MERCHANT', label: 'Merchant', email: 'merchant@resolvex.demo' },
-  { role: 'ANALYST', label: 'Analyst', email: 'analyst@resolvex.demo' },
-];
+// Prototype-only credential for the seeded demo accounts. Never printed on screen —
+// see DemoAccountsPanel, which lists the accounts without exposing this value.
 const DEMO_PASSWORD = 'ResolveXDemo123!';
 
 export function LoginPage() {
@@ -118,26 +116,10 @@ export function LoginPage() {
           </form>
 
           <p className="text-center text-muted mt-4 mb-0">
-            New to ResolveX? <Link to="/register">Create an account</Link>
+            New to {APP_NAME}? <Link to="/register">Create an account</Link>
           </p>
 
-          <div className="mt-4 pt-4 border-top">
-            <p className="small fw-semibold text-uppercase text-muted mb-2" style={{ letterSpacing: '0.06em' }}>
-              Quick demo access
-            </p>
-            <div className="d-flex flex-wrap gap-2">
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.role}
-                  type="button"
-                  className="btn btn-sm btn-outline-secondary"
-                  onClick={() => fillDemoAccount(account.email)}
-                >
-                  {account.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DemoAccountsPanel onSelect={fillDemoAccount} />
         </div>
       </div>
     </div>

@@ -1,9 +1,14 @@
+import { APP_NAME, DEMO_MODE_LABEL } from '../../config/env';
+
 export function AuthBrandPanel() {
   return (
     <div className="rx-auth-brand">
-      <div className="rx-brand-mark position-relative">
-        <span className="rx-brand-mark-icon">RX</span>
-        ResolveX
+      <div className="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div className="rx-brand-mark position-relative">
+          <span className="rx-brand-mark-icon">RX</span>
+          {APP_NAME}
+        </div>
+        {DEMO_MODE_LABEL ? <span className="rx-demo-badge position-relative">{DEMO_MODE_LABEL}</span> : null}
       </div>
 
       <div className="rx-auth-quote">

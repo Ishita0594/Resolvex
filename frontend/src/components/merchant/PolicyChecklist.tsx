@@ -117,15 +117,10 @@ export function PolicyChecklist({ requirements, values, onChange, readOnly = fal
                   />
                 </div>
                 <div className="col-12">
-                  <button
-                    type="button"
-                    className="btn btn-sm btn-outline-secondary disabled"
-                    disabled
-                    title="File attachments will be available in a future phase"
-                  >
+                  <p className="text-muted small mb-0">
                     <i className="bi bi-paperclip me-1" aria-hidden="true" />
-                    Attach file (coming soon)
-                  </button>
+                    Upload the supporting file in the &ldquo;Evidence attachments&rdquo; section on this page, then reference it here.
+                  </p>
                 </div>
               </div>
             )}

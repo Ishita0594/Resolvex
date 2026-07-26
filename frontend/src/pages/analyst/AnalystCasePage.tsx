@@ -20,7 +20,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useCaseEvaluation } from '../../hooks/useCaseEvaluation';
 import { useCaseEvent } from '../../realtime/useCaseEvent';
 import { useRealtime } from '../../realtime/RealtimeContext';
-import { ANALYST_DECISION_LABELS, REASON_CODE_LABELS } from '../../types/domain';
+import { ANALYST_DECISION_LABELS, CASE_STATUS_LABELS, REASON_CODE_LABELS } from '../../types/domain';
 import type { AnalystCaseDetail, AuditLogEntry, CaseEventPayload, EvidenceItem, EvidenceMatrixResponse } from '../../types/domain';
 import { getDecisionState } from '../../utils/decisionExplanation';
 import { resolveApiError } from '../../utils/apiError';
@@ -317,7 +317,11 @@ export function AnalystCasePage() {
               caseId={caseDetail.id}
               latestRecommendation={caseDetail.latestRecommendation}
               disabled={!canDecide}
-              disabledReason={!canDecide ? `This case is ${caseDetail.status.toLowerCase()} and can no longer be decided.` : undefined}
+              disabledReason={
+                !canDecide
+                  ? `This case is ${CASE_STATUS_LABELS[caseDetail.status].toLowerCase()} and can no longer be decided.`
+                  : undefined
+              }
               onDecided={() => {
                 loadCase();
                 loadAuditLog();

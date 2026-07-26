@@ -7,6 +7,7 @@ import { AppLayout } from './components/layout/AppLayout';
 import { ToastProvider } from './components/common/ToastProvider';
 import { NotificationsProvider } from './notifications/NotificationsContext';
 import { RealtimeProvider } from './realtime/RealtimeContext';
+import { LandingPage } from './pages/marketing/LandingPage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
 import { CardMemberDashboard } from './pages/member/CardMemberDashboard';
@@ -38,7 +39,7 @@ function RootRedirect() {
     return <Navigate to={DASHBOARD_PATH_BY_ROLE[user.role]} replace />;
   }
 
-  return <Navigate to="/login" replace />;
+  return <LandingPage />;
 }
 
 function AppRoutes() {

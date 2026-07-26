@@ -6,6 +6,7 @@ import { MerchantCaseTable } from '../../components/merchant/MerchantCaseTable';
 import { ErrorState, type ErrorStateVariant } from '../../components/common/ErrorState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { StatTile } from '../../components/common/StatTile';
 import { resolveApiError } from '../../utils/apiError';
 import { formatDate } from '../../utils/format';
 import { isApproachingDeadline, isAwaitingMerchantResponse, isOpenCase } from '../../utils/merchantCase';
@@ -13,35 +14,6 @@ import type { DisputeCase } from '../../types/domain';
 
 const ASSIGNED_CASES_PREVIEW_LIMIT = 8;
 const RECENTLY_SUBMITTED_LIMIT = 5;
-
-const STAT_TILE_COLORS: Record<string, { bg: string; fg: string }> = {
-  submitted: { bg: 'var(--rx-blue-100)', fg: 'var(--rx-status-submitted)' },
-  processing: { bg: '#fdf2df', fg: 'var(--rx-status-processing)' },
-  review: { bg: '#fdead9', fg: 'var(--rx-status-review)' },
-  resolved: { bg: '#e2f6ec', fg: 'var(--rx-status-resolved)' },
-};
-
-function StatTile({ icon, tone, value, label }: { icon: string; tone: keyof typeof STAT_TILE_COLORS; value: number; label: string }) {
-  const colors = STAT_TILE_COLORS[tone];
-  return (
-    <div className="col-sm-6 col-lg-3">
-      <div className="rx-card p-3 h-100">
-        <div className="d-flex align-items-center gap-3">
-          <span
-            className="d-inline-flex align-items-center justify-content-center flex-shrink-0"
-            style={{ width: 40, height: 40, borderRadius: '50%', background: colors.bg, color: colors.fg }}
-          >
-            <i className={`bi ${icon}`} style={{ fontSize: '1.1rem' }} aria-hidden="true" />
-          </span>
-          <div>
-            <div className="h4 fw-bold mb-0">{value}</div>
-            <div className="text-muted small">{label}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DashboardSection({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (

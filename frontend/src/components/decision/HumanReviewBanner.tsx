@@ -1,3 +1,4 @@
+import { APP_NAME } from '../../config/env';
 import { splitHumanReviewReasons } from '../../utils/decisionExplanation';
 
 export function HumanReviewBanner({ reason }: { reason: string | null }) {
@@ -11,7 +12,7 @@ export function HumanReviewBanner({ reason }: { reason: string | null }) {
           <p className="fw-semibold mb-1">This case needs human review</p>
           <p className="mb-2 small">
             Automated evaluation stopped short of a recommendation. This does not mean either party has already won or
-            lost &mdash; a ResolveX analyst will review the evidence from both sides before a decision is made.
+            lost &mdash; a {APP_NAME} analyst will review the evidence from both sides before a decision is made.
           </p>
           {reasons.length > 0 ? (
             <>
