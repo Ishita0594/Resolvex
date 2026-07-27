@@ -1029,18 +1029,6 @@ function supportDirectionFor(
     return EvidenceSupportDirection.SUPPORTS_CARD_MEMBER;
   }
 
-  if (evidence.extractedFacts.some((fact) => fact.factType === 'DISPATCHED')) {
-    return EvidenceSupportDirection.NEUTRAL;
-  }
-
-  if (evidence.submittedByRole === Role.CARD_MEMBER) {
-    return EvidenceSupportDirection.SUPPORTS_CARD_MEMBER;
-  }
-
-  if (evidence.submittedByRole === Role.MERCHANT) {
-    return EvidenceSupportDirection.SUPPORTS_MERCHANT;
-  }
-
   return EvidenceSupportDirection.NEUTRAL;
 }
 

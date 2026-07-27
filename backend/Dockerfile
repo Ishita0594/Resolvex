@@ -40,4 +40,4 @@ RUN mkdir -p /app/storage/evidence \
 USER resolvex
 EXPOSE 3000
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
