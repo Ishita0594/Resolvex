@@ -92,7 +92,7 @@ services:
       [
         "sh",
         "-c",
-        "npx prisma migrate deploy && npm run prisma:seed && node dist/main.js",
+        "npx prisma migrate deploy && npm run prisma:seed && node dist/src/main.js",
       ]
     healthcheck:
       test:
